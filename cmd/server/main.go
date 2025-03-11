@@ -11,17 +11,8 @@ import (
 	"github.com/carrionlang-lsp/lsp/internal/handler"
 	"github.com/carrionlang-lsp/lsp/internal/langserver"
 	"github.com/carrionlang-lsp/lsp/internal/util"
-
 	"go.lsp.dev/jsonrpc2"
 )
-
-// Define a strict jsonrpc2 handler function type
-type jsonrpcHandlerFunc func(ctx context.Context, req jsonrpc2.Request) (result interface{}, err error)
-
-// Make it satisfy the jsonrpc2.Handler interface
-func (h jsonrpcHandlerFunc) Handle(ctx context.Context, req jsonrpc2.Request) (interface{}, error) {
-	return h(ctx, req)
-}
 
 var (
 	version = "dev"
@@ -36,7 +27,6 @@ var (
 
 func main() {
 	flag.Parse()
-
 	// Configure logging
 	var logWriter util.LogWriter = util.StderrLogger{}
 	if *logFile != "" {
@@ -51,7 +41,6 @@ func main() {
 		defer f.Close()
 		logWriter = util.FileLogger{File: f}
 	}
-
 	logger := util.NewLogger(logWriter)
 	logger.Info("Starting Carrion Language Server %s", version)
 
@@ -69,12 +58,11 @@ func main() {
 		func(ctx context.Context, conn jsonrpc2.Conn) {
 			h := handler.NewHandler(logger, conn)
 
-			// Create a function adapter
-			handlerFunc := jsonrpcHandlerFunc(
-				func(ctx context.Context, req jsonrpc2.Request) (interface{}, error) {
-					return h.Handle(ctx, req)
-				},
-			)
+			// Create a function adapter that matches jsonrpc2.Handler type
+			handlerFunc := func(ctx context.Context, reply jsonrpc2.Replier, req jsonrpc2.Request) error {
+				result, err := h.Handle(ctx, req)
+				return reply(ctx, result, err)
+			}
 
 			conn.Go(ctx, handlerFunc)
 			<-conn.Done()
@@ -93,12 +81,11 @@ func runServer(ctx context.Context, stream jsonrpc2.Stream, logger *util.Logger)
 	conn := jsonrpc2.NewConn(stream)
 	h := handler.NewHandler(logger, conn)
 
-	// Create a function adapter
-	handlerFunc := jsonrpcHandlerFunc(
-		func(ctx context.Context, req jsonrpc2.Request) (interface{}, error) {
-			return h.Handle(ctx, req)
-		},
-	)
+	// Create a function adapter that matches jsonrpc2.Handler type
+	handlerFunc := func(ctx context.Context, reply jsonrpc2.Replier, req jsonrpc2.Request) error {
+		result, err := h.Handle(ctx, req)
+		return reply(ctx, result, err)
+	}
 
 	conn.Go(ctx, handlerFunc)
 	<-conn.Done()
