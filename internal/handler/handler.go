@@ -14,6 +14,11 @@ import (
 	lsp "go.lsp.dev/protocol"
 )
 
+// ErrorCodes defined in the JSON-RPC spec
+const (
+	CodeMethodNotFound = -32601
+)
+
 type Handler struct {
 	conn          jsonrpc2.Conn
 	logger        *util.Logger
@@ -43,16 +48,16 @@ func NewHandler(logger *util.Logger, conn jsonrpc2.Conn) *Handler {
 // Handle implements jsonrpc2.Handler interface
 func (h *Handler) Handle(
 	ctx context.Context,
-	req *jsonrpc2.Request,
+	req jsonrpc2.Request,
 ) (result interface{}, err error) {
-	h.logger.Debug("Received request: %s", req.Method)
+	h.logger.Debug("Received request: %s", req.Method())
 
 	// Allow initialize even if not initialized yet
-	if !h.initialized && req.Method != "initialize" {
+	if !h.initialized && req.Method() != "initialize" {
 		return nil, fmt.Errorf("server not initialized")
 	}
 
-	switch req.Method {
+	switch req.Method() {
 	case "initialize":
 		return h.handleInitialize(ctx, req)
 	case "initialized":
@@ -76,27 +81,27 @@ func (h *Handler) Handle(
 	case "textDocument/hover":
 		return h.handleTextDocumentHover(ctx, req)
 	default:
-		h.logger.Warn("Unsupported method: %s", req.Method)
+		h.logger.Warn("Unsupported method: %s", req.Method())
 		return nil, &jsonrpc2.Error{
-			Code:    jsonrpc2.CodeMethodNotFound,
-			Message: fmt.Sprintf("method not supported: %s", req.Method),
+			Code:    CodeMethodNotFound,
+			Message: fmt.Sprintf("method not supported: %s", req.Method()),
 		}
 	}
 }
 
 func (h *Handler) handleInitialize(
 	ctx context.Context,
-	req *jsonrpc2.Request,
+	req jsonrpc2.Request,
 ) (interface{}, error) {
 	h.logger.Info("Initializing Carrion Language Server")
 
 	var params lsp.InitializeParams
-	if err := json.Unmarshal(*req.Params, &params); err != nil {
+	if err := json.Unmarshal(req.Params(), &params); err != nil {
 		return nil, err
 	}
 
-	if params.WorkspaceFolders != nil && len(*params.WorkspaceFolders) > 0 {
-		h.workspace = (*params.WorkspaceFolders)[0]
+	if params.WorkspaceFolders != nil && len(params.WorkspaceFolders) > 0 {
+		h.workspace = params.WorkspaceFolders[0]
 	}
 
 	// Set server capabilities
@@ -127,36 +132,37 @@ func (h *Handler) handleInitialize(
 
 func (h *Handler) handleInitialized(
 	ctx context.Context,
-	req *jsonrpc2.Request,
+	req jsonrpc2.Request,
 ) (interface{}, error) {
 	h.logger.Info("Server initialized")
 	return nil, nil
 }
 
-func (h *Handler) handleShutdown(ctx context.Context, req *jsonrpc2.Request) (interface{}, error) {
+func (h *Handler) handleShutdown(ctx context.Context, req jsonrpc2.Request) (interface{}, error) {
 	h.logger.Info("Shutting down")
 	h.initialized = false
 	return nil, nil
 }
 
-func (h *Handler) handleExit(ctx context.Context, req *jsonrpc2.Request) (interface{}, error) {
+func (h *Handler) handleExit(ctx context.Context, req jsonrpc2.Request) (interface{}, error) {
 	h.logger.Info("Exiting")
 	return nil, nil
 }
 
 func (h *Handler) handleTextDocumentDidOpen(
 	ctx context.Context,
-	req *jsonrpc2.Request,
+	req jsonrpc2.Request,
 ) (interface{}, error) {
 	var params lsp.DidOpenTextDocumentParams
-	if err := json.Unmarshal(*req.Params, &params); err != nil {
+	if err := json.Unmarshal(req.Params(), &params); err != nil {
 		return nil, err
 	}
 
 	h.logger.Debug("Document opened: %s", params.TextDocument.URI)
+
 	h.documentStore.AddDocument(
 		params.TextDocument.URI,
-		params.TextDocument.LanguageID,
+		string(params.TextDocument.LanguageID),
 		params.TextDocument.Text,
 		params.TextDocument.Version,
 	)
@@ -170,10 +176,10 @@ func (h *Handler) handleTextDocumentDidOpen(
 
 func (h *Handler) handleTextDocumentDidChange(
 	ctx context.Context,
-	req *jsonrpc2.Request,
+	req jsonrpc2.Request,
 ) (interface{}, error) {
 	var params lsp.DidChangeTextDocumentParams
-	if err := json.Unmarshal(*req.Params, &params); err != nil {
+	if err := json.Unmarshal(req.Params(), &params); err != nil {
 		return nil, err
 	}
 
@@ -193,10 +199,10 @@ func (h *Handler) handleTextDocumentDidChange(
 
 func (h *Handler) handleTextDocumentDidClose(
 	ctx context.Context,
-	req *jsonrpc2.Request,
+	req jsonrpc2.Request,
 ) (interface{}, error) {
 	var params lsp.DidCloseTextDocumentParams
-	if err := json.Unmarshal(*req.Params, &params); err != nil {
+	if err := json.Unmarshal(req.Params(), &params); err != nil {
 		return nil, err
 	}
 
@@ -211,10 +217,10 @@ func (h *Handler) handleTextDocumentDidClose(
 
 func (h *Handler) handleTextDocumentCompletion(
 	ctx context.Context,
-	req *jsonrpc2.Request,
+	req jsonrpc2.Request,
 ) (interface{}, error) {
 	var params lsp.CompletionParams
-	if err := json.Unmarshal(*req.Params, &params); err != nil {
+	if err := json.Unmarshal(req.Params(), &params); err != nil {
 		return nil, err
 	}
 
@@ -230,10 +236,10 @@ func (h *Handler) handleTextDocumentCompletion(
 
 func (h *Handler) handleTextDocumentFormatting(
 	ctx context.Context,
-	req *jsonrpc2.Request,
+	req jsonrpc2.Request,
 ) (interface{}, error) {
 	var params lsp.DocumentFormattingParams
-	if err := json.Unmarshal(*req.Params, &params); err != nil {
+	if err := json.Unmarshal(req.Params(), &params); err != nil {
 		return nil, err
 	}
 
@@ -250,10 +256,10 @@ func (h *Handler) handleTextDocumentFormatting(
 
 func (h *Handler) handleTextDocumentDefinition(
 	ctx context.Context,
-	req *jsonrpc2.Request,
+	req jsonrpc2.Request,
 ) (interface{}, error) {
 	var params lsp.DefinitionParams
-	if err := json.Unmarshal(*req.Params, &params); err != nil {
+	if err := json.Unmarshal(req.Params(), &params); err != nil {
 		return nil, err
 	}
 
@@ -269,10 +275,10 @@ func (h *Handler) handleTextDocumentDefinition(
 
 func (h *Handler) handleTextDocumentHover(
 	ctx context.Context,
-	req *jsonrpc2.Request,
+	req jsonrpc2.Request,
 ) (interface{}, error) {
 	var params lsp.HoverParams
-	if err := json.Unmarshal(*req.Params, &params); err != nil {
+	if err := json.Unmarshal(req.Params(), &params); err != nil {
 		return nil, err
 	}
 

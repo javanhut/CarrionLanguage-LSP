@@ -7,7 +7,6 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/carrionlang-lsp/lsp/internal/handler"
 	"github.com/carrionlang-lsp/lsp/internal/langserver"
@@ -15,6 +14,14 @@ import (
 
 	"go.lsp.dev/jsonrpc2"
 )
+
+// Define a strict jsonrpc2 handler function type
+type jsonrpcHandlerFunc func(ctx context.Context, req jsonrpc2.Request) (result interface{}, err error)
+
+// Make it satisfy the jsonrpc2.Handler interface
+func (h jsonrpcHandlerFunc) Handle(ctx context.Context, req jsonrpc2.Request) (interface{}, error) {
+	return h(ctx, req)
+}
 
 var (
 	version = "dev"
@@ -37,7 +44,6 @@ func main() {
 		if err := os.MkdirAll(dir, os.ModePerm); err != nil {
 			log.Fatalf("Failed to create log directory: %v", err)
 		}
-
 		f, err := os.Create(*logFile)
 		if err != nil {
 			log.Fatalf("Failed to create log file: %v", err)
@@ -62,7 +68,19 @@ func main() {
 		*addr,
 		func(ctx context.Context, conn jsonrpc2.Conn) {
 			h := handler.NewHandler(logger, conn)
-			serveConn(ctx, conn, h)
+
+			// Create a function adapter
+			handlerFunc := jsonrpcHandlerFunc(
+				func(ctx context.Context, req jsonrpc2.Request) (interface{}, error) {
+					return h.Handle(ctx, req)
+				},
+			)
+
+			conn.Go(ctx, handlerFunc)
+			<-conn.Done()
+			if err := conn.Err(); err != nil {
+				fmt.Fprintf(os.Stderr, "Connection closed with error: %v\n", err)
+			}
 		},
 	)
 	if err != nil {
@@ -74,11 +92,15 @@ func main() {
 func runServer(ctx context.Context, stream jsonrpc2.Stream, logger *util.Logger) {
 	conn := jsonrpc2.NewConn(stream)
 	h := handler.NewHandler(logger, conn)
-	serveConn(ctx, conn, h)
-}
 
-func serveConn(ctx context.Context, conn jsonrpc2.Conn, h jsonrpc2.Handler) {
-	conn.Go(ctx, h)
+	// Create a function adapter
+	handlerFunc := jsonrpcHandlerFunc(
+		func(ctx context.Context, req jsonrpc2.Request) (interface{}, error) {
+			return h.Handle(ctx, req)
+		},
+	)
+
+	conn.Go(ctx, handlerFunc)
 	<-conn.Done()
 	if err := conn.Err(); err != nil {
 		fmt.Fprintf(os.Stderr, "Connection closed with error: %v\n", err)
