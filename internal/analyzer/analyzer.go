@@ -15,14 +15,14 @@ import (
 	lsp "go.lsp.dev/protocol"
 )
 
-// CarrionAnalyzer provides language analysis for Carrion language files
+
+
 type CarrionAnalyzer struct {
 	logger        *util.Logger
 	documentStore *protocol.CarrionDocumentStore
 	symbolTable   *symbols.SymbolTable
 }
 
-// NewCarrionAnalyzer creates a new analyzer
 func NewCarrionAnalyzer(logger *util.Logger, docStore *protocol.CarrionDocumentStore) *CarrionAnalyzer {
 	return &CarrionAnalyzer{
 		logger:        logger,
@@ -31,7 +31,7 @@ func NewCarrionAnalyzer(logger *util.Logger, docStore *protocol.CarrionDocumentS
 	}
 }
 
-// AnalyzeDocument analyzes a document and returns diagnostics
+
 func (a *CarrionAnalyzer) AnalyzeDocument(uri lsp.DocumentURI) []lsp.Diagnostic {
 	doc := a.documentStore.GetDocument(uri)
 	if doc == nil {

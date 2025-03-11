@@ -2,12 +2,12 @@ package protocol
 
 import (
 	"github.com/carrionlang-lsp/lsp/internal/util"
-	"go.lsp.dev/protocol"
+	lsp "go.lsp.dev/protocol"
 )
 
 // CarrionDocument represents a Carrion source file that is being edited
 type CarrionDocument struct {
-	URI        protocol.DocumentURI
+	URI        lsp.DocumentURI
 	Text       string
 	Version    int32
 	LanguageID string
@@ -15,20 +15,20 @@ type CarrionDocument struct {
 
 // CarrionDocumentStore keeps track of all open documents
 type CarrionDocumentStore struct {
-	Documents map[protocol.DocumentURI]*CarrionDocument
+	Documents map[lsp.DocumentURI]*CarrionDocument
 	Logger    *util.Logger
 }
 
 // NewDocumentStore creates a new document store
 func NewDocumentStore(logger *util.Logger) *CarrionDocumentStore {
 	return &CarrionDocumentStore{
-		Documents: make(map[protocol.DocumentURI]*CarrionDocument),
+		Documents: make(map[lsp.DocumentURI]*CarrionDocument),
 		Logger:    logger,
 	}
 }
 
 // GetDocument retrieves a document by URI
-func (s *CarrionDocumentStore) GetDocument(uri protocol.DocumentURI) *CarrionDocument {
+func (s *CarrionDocumentStore) GetDocument(uri lsp.DocumentURI) *CarrionDocument {
 	doc, ok := s.Documents[uri]
 	if !ok {
 		return nil
@@ -38,7 +38,7 @@ func (s *CarrionDocumentStore) GetDocument(uri protocol.DocumentURI) *CarrionDoc
 
 // AddDocument adds a document to the store
 func (s *CarrionDocumentStore) AddDocument(
-	uri protocol.DocumentURI,
+	uri lsp.DocumentURI,
 	languageID string,
 	text string,
 	version int32,
@@ -56,8 +56,8 @@ func (s *CarrionDocumentStore) AddDocument(
 
 // UpdateDocument updates a document's content
 func (s *CarrionDocumentStore) UpdateDocument(
-	uri protocol.DocumentURI,
-	changes []protocol.TextDocumentContentChangeEvent,
+	uri lsp.DocumentURI,
+	changes []lsp.TextDocumentContentChangeEvent,
 	version int32,
 ) *CarrionDocument {
 	doc := s.GetDocument(uri)
@@ -73,23 +73,15 @@ func (s *CarrionDocumentStore) UpdateDocument(
 	}
 
 	// Handle full document update
-	if changes[0].Range == nil {
-		doc.Text = changes[0].Text
-		doc.Version = version
-		s.Logger.Debug("Full update of document: %s (version: %d)", uri, version)
-		return doc
-	}
-
-	// Handle incremental updates (not implemented yet)
-	s.Logger.Warn("Incremental updates not fully implemented yet")
-	doc.Text = changes[0].Text // Treating as full update for now
+	// Note: We're only supporting full content updates for now
+	doc.Text = changes[0].Text
 	doc.Version = version
-
+	s.Logger.Debug("Full update of document: %s (version: %d)", uri, version)
 	return doc
 }
 
 // RemoveDocument removes a document from the store
-func (s *CarrionDocumentStore) RemoveDocument(uri protocol.DocumentURI) {
+func (s *CarrionDocumentStore) RemoveDocument(uri lsp.DocumentURI) {
 	if _, ok := s.Documents[uri]; ok {
 		delete(s.Documents, uri)
 		s.Logger.Debug("Removed document: %s", uri)
@@ -97,21 +89,21 @@ func (s *CarrionDocumentStore) RemoveDocument(uri protocol.DocumentURI) {
 }
 
 // DiagnosticSeverity maps error types to LSP severity levels
-var DiagnosticSeverity = map[string]protocol.DiagnosticSeverity{
-	"error":   protocol.DiagnosticSeverityError,
-	"warning": protocol.DiagnosticSeverityWarning,
-	"info":    protocol.DiagnosticSeverityInformation,
-	"hint":    protocol.DiagnosticSeverityHint,
+var DiagnosticSeverity = map[string]lsp.DiagnosticSeverity{
+	"error":   lsp.DiagnosticSeverityError,
+	"warning": lsp.DiagnosticSeverityWarning,
+	"info":    lsp.DiagnosticSeverityInformation,
+	"hint":    lsp.DiagnosticSeverityHint,
 }
 
 // CompletionItemKind maps Carrion symbol types to LSP completion item kinds
-var CompletionItemKind = map[string]protocol.CompletionItemKind{
-	"keyword":   protocol.CompletionItemKindKeyword,
-	"spellbook": protocol.CompletionItemKindClass,
-	"spell":     protocol.CompletionItemKindFunction,
-	"variable":  protocol.CompletionItemKindVariable,
-	"field":     protocol.CompletionItemKindField,
-	"method":    protocol.CompletionItemKindMethod,
-	"const":     protocol.CompletionItemKindConstant,
-	"import":    protocol.CompletionItemKindModule,
+var CompletionItemKind = map[string]lsp.CompletionItemKind{
+	"keyword":   lsp.CompletionItemKindKeyword,
+	"spellbook": lsp.CompletionItemKindClass,
+	"spell":     lsp.CompletionItemKindFunction,
+	"variable":  lsp.CompletionItemKindVariable,
+	"field":     lsp.CompletionItemKindField,
+	"method":    lsp.CompletionItemKindMethod,
+	"const":     lsp.CompletionItemKindConstant,
+	"import":    lsp.CompletionItemKindModule,
 }
