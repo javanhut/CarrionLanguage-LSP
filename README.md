@@ -39,6 +39,28 @@ go build -o carrion-lsp ./cmd/server/main.go
 sudo mv carrion-lsp /usr/local/bin/
 ```
 
+# Alternative Installation
+
+
+1. Install Carrion LSP using Make
+
+```bash
+make install
+```
+
+2. Uninstall Carrion Lsp using Make
+```bash
+make uninstall
+```
+
+3. Get Help
+```bash
+make help
+```
+
+* Ensure make is installed.
+* Note: You may need elevated privileges like sudo to use make option and make must be installed as well.
+
 ### Step 2: Configure Neovim with NvChad
 
 #### LSP Configuration
