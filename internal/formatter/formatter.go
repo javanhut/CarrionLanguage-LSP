@@ -81,18 +81,27 @@ func calculateEndPosition(text string) lsp.Position {
 
 // formatterContext keeps track of formatting state
 type formatterContext struct {
-	indentLevel int
-	indentStr   string
-	output      *strings.Builder
+	indentLevel      int
+	indentStr        string
+	output           *strings.Builder
+	inSpellbook      bool
+	inSpell          bool
+	lastLineEmpty    bool
+	lastLineIndented bool
+	blockStack       []string // Tracks nested block types for context-aware formatting
 }
 
 // formatDocument formats a Carrion document
 func (f *CarrionFormatter) formatDocument(text string) string {
 	// Create a formatter context
 	ctx := &formatterContext{
-		indentLevel: 0,
-		indentStr:   "    ", // 4 spaces for indentation
-		output:      &strings.Builder{},
+		indentLevel:   0,
+		indentStr:     "    ", // 4 spaces for indentation
+		output:        &strings.Builder{},
+		inSpellbook:   false,
+		inSpell:       false,
+		lastLineEmpty: false,
+		blockStack:    make([]string, 0),
 	}
 
 	// Split the document into lines
@@ -100,42 +109,159 @@ func (f *CarrionFormatter) formatDocument(text string) string {
 
 	// Process each line with correct indentation
 	for i, line := range lines {
-		f.formatLine(line, i, ctx)
+		// Get next line if available, otherwise empty string
+		nextLine := ""
+		if i < len(lines)-1 {
+			nextLine = lines[i+1]
+		}
+		f.formatLine(line, i, ctx, nextLine)
 	}
 
 	return ctx.output.String()
 }
 
 // formatLine formats a single line of code
-func (f *CarrionFormatter) formatLine(line string, lineNum int, ctx *formatterContext) {
-	// Skip empty lines
+func (f *CarrionFormatter) formatLine(
+	line string,
+	lineNum int,
+	ctx *formatterContext,
+	nextLine string,
+) {
+	// Skip empty lines but keep track of them
 	trimmedLine := strings.TrimSpace(line)
 	if trimmedLine == "" {
-		ctx.output.WriteString("\n")
+		// Don't output consecutive empty lines
+		if !ctx.lastLineEmpty {
+			ctx.output.WriteString("\n")
+			ctx.lastLineEmpty = true
+		}
 		return
 	}
 
-	// Handle indentation for block structures
-	if isBlockEnd(trimmedLine) {
+	// Track if this line starts a new block or ends one
+	isStart := isBlockStart(trimmedLine)
+	isEnd := isBlockEnd(trimmedLine)
+
+	// Determine if this is a spellbook or spell declaration
+	isSpellbook := strings.HasPrefix(trimmedLine, "spellbook ")
+	isSpell := strings.HasPrefix(trimmedLine, "spell ")
+
+	// Determine if this is a control flow statement
+	isControlFlow := isControlFlowStart(trimmedLine)
+
+	// Handle indentation adjustments before writing the line
+	if isEnd && !isStart {
+		// End a block
+		if len(ctx.blockStack) > 0 {
+			ctx.blockStack = ctx.blockStack[:len(ctx.blockStack)-1]
+		}
 		if ctx.indentLevel > 0 {
 			ctx.indentLevel--
 		}
 	}
 
-	// Apply current indentation level
-	for i := 0; i < ctx.indentLevel; i++ {
-		ctx.output.WriteString(ctx.indentStr)
+	// Special formatting for spellbook and spell declarations
+	if isSpellbook {
+		// Start of a spellbook - reset to base level
+		ctx.inSpellbook = true
+		ctx.indentLevel = 0
+
+		// Add empty line before spellbook unless it's the first line
+		if lineNum > 0 && !ctx.lastLineEmpty {
+			ctx.output.WriteString("\n")
+		}
+	} else if isSpell {
+		// Add empty line between spells in a spellbook
+		if ctx.inSpell && !ctx.lastLineEmpty {
+			ctx.output.WriteString("\n")
+		}
+
+		// Spells inside a spellbook should be indented one level
+		if ctx.inSpellbook {
+			ctx.indentLevel = 1
+		} else {
+			ctx.indentLevel = 0
+		}
+
+		ctx.inSpell = true
+	} else if isControlFlow && ctx.inSpell {
+		// Control flow statements follow the current indent level
+		// No adjustment needed as they will be properly indented
 	}
+
+	// Apply current indentation level
+	indent := strings.Repeat(ctx.indentStr, ctx.indentLevel)
+	ctx.output.WriteString(indent)
 
 	// Process the line content
 	formattedLine := f.processLine(trimmedLine)
 	ctx.output.WriteString(formattedLine)
 	ctx.output.WriteString("\n")
 
-	// Check if this line starts a new block
-	if isBlockStart(trimmedLine) {
+	// Update state for next line
+	ctx.lastLineEmpty = false
+	ctx.lastLineIndented = isStart && !isEnd
+
+	// Handle indentation adjustments after writing the line
+	if isStart && !isEnd {
+		// Start a new block and track its type
+		blockType := getBlockType(trimmedLine)
+		ctx.blockStack = append(ctx.blockStack, blockType)
 		ctx.indentLevel++
 	}
+
+	// Handle spacing between different sections
+	trimmedNextLine := strings.TrimSpace(nextLine)
+	if isSpell && ctx.inSpellbook && isSpell && trimmedNextLine != "" &&
+		!strings.HasPrefix(trimmedNextLine, "spell ") {
+		// Add a blank line after spell definition if the next line isn't empty or another spell
+		ctx.output.WriteString("\n")
+		ctx.lastLineEmpty = true
+	}
+}
+
+// getBlockType determines the type of block being started
+func getBlockType(line string) string {
+	if strings.HasPrefix(line, "spellbook ") {
+		return "spellbook"
+	} else if strings.HasPrefix(line, "spell ") {
+		return "spell"
+	} else if strings.HasPrefix(line, "if ") {
+		return "if"
+	} else if strings.HasPrefix(line, "otherwise") {
+		return "otherwise"
+	} else if strings.HasPrefix(line, "for ") {
+		return "for"
+	} else if strings.HasPrefix(line, "while ") {
+		return "while"
+	} else if strings.HasPrefix(line, "attempt:") {
+		return "attempt"
+	} else if strings.HasPrefix(line, "ensnare") {
+		return "ensnare"
+	} else if strings.HasPrefix(line, "resolve:") {
+		return "resolve"
+	} else if strings.HasPrefix(line, "match ") {
+		return "match"
+	} else if strings.HasPrefix(line, "case ") {
+		return "case"
+	}
+	return "generic"
+}
+
+// isControlFlowStart returns true if the line starts a control flow statement
+func isControlFlowStart(line string) bool {
+	controlFlowStarters := []string{
+		"if ", "otherwise", "else:", "for ", "while ", "attempt:",
+		"ensnare", "resolve:", "match ", "case ",
+	}
+
+	for _, starter := range controlFlowStarters {
+		if strings.HasPrefix(line, starter) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // processLine applies formatting rules to a line of code
@@ -160,18 +286,18 @@ func (f *CarrionFormatter) processLine(line string) string {
 
 // isBlockStart returns true if the line starts a new block
 func isBlockStart(line string) bool {
-	blockStarters := []string{
-		"if ", "otherwise ", "else:", "for ", "while ", "spell ", "spellbook ", "attempt:",
-		"ensnare", "resolve:", "match ", "case ", "init",
-	}
-
 	// Check if the line ends with a colon
 	if strings.HasSuffix(strings.TrimSpace(line), ":") {
 		return true
 	}
 
+	blockStarters := []string{
+		"if ", "otherwise", "else:", "for ", "while ", "spell ", "spellbook ", "attempt:",
+		"ensnare", "resolve:", "match ", "case ", "init",
+	}
+
 	for _, starter := range blockStarters {
-		if strings.HasPrefix(strings.TrimSpace(line), starter) {
+		if strings.HasPrefix(line, starter) {
 			return true
 		}
 	}
@@ -181,7 +307,18 @@ func isBlockStart(line string) bool {
 
 // isBlockEnd returns true if the line ends a block
 func isBlockEnd(line string) bool {
-	return strings.HasPrefix(strings.TrimSpace(line), "}")
+	blockEnders := []string{
+		"}", "end", "endif", "endspell", "endspellbook", "endfor", "endwhile",
+		"endattempt", "endensnare", "endresolve", "endmatch", "endcase",
+	}
+
+	for _, ender := range blockEnders {
+		if line == ender || strings.HasPrefix(line, ender+" ") {
+			return true
+		}
+	}
+
+	return false
 }
 
 // formatOperators ensures proper spacing around operators
