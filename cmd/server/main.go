@@ -21,12 +21,18 @@ var (
 		"localhost:7777",
 		"TCP address to listen on (e.g., localhost:7777)",
 	)
-	stdio   = flag.Bool("stdio", false, "Use stdio for communication (default: TCP)")
-	logFile = flag.String("log", "", "Path to log file (default: disabled)")
+	stdio       = flag.Bool("stdio", false, "Use stdio for communication (default: TCP)")
+	logFile     = flag.String("log", "", "Path to log file (default: disabled)")
+	showVersion = flag.Bool("version", false, "Show version information and exit")
 )
 
 func main() {
 	flag.Parse()
+
+	if *showVersion {
+		fmt.Printf("Carrion Language Server %s\n", version)
+		return
+	}
 	// Configure logging
 	var logWriter util.LogWriter = util.StderrLogger{}
 	if *logFile != "" {
