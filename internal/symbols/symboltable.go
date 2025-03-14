@@ -16,7 +16,7 @@ type Parameter struct {
 type Symbol struct {
 	Name             string
 	Type             string
-	SpellbookName    string
+	GrimoireName     string
 	ValueType        string
 	Documentation    string
 	Parameters       []Parameter
@@ -26,8 +26,8 @@ type Symbol struct {
 	Scope            *Scope
 }
 
-// SpellbookSymbol represents a spellbook declaration
-type SpellbookSymbol struct {
+// GrimoireSymbol represents a Grimoire declaration
+type GrimoireSymbol struct {
 	Name           string
 	Methods        []*Symbol
 	Fields         []*Symbol
@@ -43,14 +43,14 @@ type Scope struct {
 	Symbols   map[string]*Symbol
 	StartLine int
 	EndLine   int
-	Spellbook *SpellbookSymbol
+	Grimoire  *GrimoireSymbol
 	URI       string
 }
 
 // SymbolTable maintains symbols for the entire codebase
 type SymbolTable struct {
 	Global     *Scope
-	Spellbooks map[string]*SpellbookSymbol
+	Grimoires  map[string]*GrimoireSymbol
 	FileScopes map[string]*Scope
 	CurrentURI string
 }
@@ -64,7 +64,7 @@ func NewSymbolTable() *SymbolTable {
 
 	return &SymbolTable{
 		Global:     globalScope,
-		Spellbooks: make(map[string]*SpellbookSymbol),
+		Grimoires:  make(map[string]*GrimoireSymbol),
 		FileScopes: make(map[string]*Scope),
 	}
 }
@@ -80,11 +80,11 @@ func (st *SymbolTable) BuildFromAST(program *ast.Program, uri string) {
 	st.FileScopes[uri] = fileScope
 	st.CurrentURI = uri
 
-	// First pass: collect spellbooks and top-level spells
+	// First pass: collect Grimoires and top-level spells
 	for _, stmt := range program.Statements {
 		switch node := stmt.(type) {
-		case *ast.SpellbookDefinition:
-			st.processSpellbookDefinition(node, fileScope)
+		case *ast.GrimoireDefinition:
+			st.processGrimoireDefinition(node, fileScope)
 		case *ast.FunctionDefinition:
 			st.processFunctionDefinition(node, fileScope)
 		case *ast.AssignStatement:
@@ -101,17 +101,17 @@ func (st *SymbolTable) BuildFromAST(program *ast.Program, uri string) {
 	}
 }
 
-// processSpellbookDefinition processes a spellbook definition
-func (st *SymbolTable) processSpellbookDefinition(node *ast.SpellbookDefinition, scope *Scope) {
-	spellbookName := node.Name.Value
+// processGrimoireDefinition processes a Grimoire definition
+func (st *SymbolTable) processGrimoireDefinition(node *ast.GrimoireDefinition, scope *Scope) {
+	GrimoireName := node.Name.Value
 	line := 0
 	column := 0
 	tokenPos := extractPositionFromToken(node.Token)
 	line = tokenPos.Line
 	column = tokenPos.Column
 
-	spellbook := &SpellbookSymbol{
-		Name:           spellbookName,
+	Grimoire := &GrimoireSymbol{
+		Name:           GrimoireName,
 		Methods:        make([]*Symbol, 0),
 		Fields:         make([]*Symbol, 0),
 		DefinitionURI:  st.CurrentURI,
@@ -119,39 +119,39 @@ func (st *SymbolTable) processSpellbookDefinition(node *ast.SpellbookDefinition,
 	}
 
 	if node.Inherits != nil {
-		spellbook.ParentName = node.Inherits.Value
+		Grimoire.ParentName = node.Inherits.Value
 	}
 
 	if node.DocString != nil {
-		spellbook.Documentation = node.DocString.Value
+		Grimoire.Documentation = node.DocString.Value
 	}
 
-	spellbookScope := &Scope{
-		Parent:    scope,
-		Symbols:   make(map[string]*Symbol),
-		Spellbook: spellbook,
-		URI:       st.CurrentURI,
+	GrimoireScope := &Scope{
+		Parent:   scope,
+		Symbols:  make(map[string]*Symbol),
+		Grimoire: Grimoire,
+		URI:      st.CurrentURI,
 	}
 
-	spellbookSymbol := &Symbol{
-		Name:             spellbookName,
-		Type:             "spellbook",
-		Documentation:    spellbook.Documentation,
+	GrimoireSymbol := &Symbol{
+		Name:             GrimoireName,
+		Type:             "Grimoire",
+		Documentation:    Grimoire.Documentation,
 		DefinitionURI:    st.CurrentURI,
 		DefinitionLine:   line,
 		DefinitionColumn: column,
-		Scope:            spellbookScope,
+		Scope:            GrimoireScope,
 	}
 
-	scope.Symbols[spellbookName] = spellbookSymbol
-	st.Spellbooks[spellbookName] = spellbook
+	scope.Symbols[GrimoireName] = GrimoireSymbol
+	st.Grimoires[GrimoireName] = Grimoire
 
 	for _, method := range node.Methods {
-		st.processMethod(method, spellbookScope, spellbook)
+		st.processMethod(method, GrimoireScope, Grimoire)
 	}
 
 	if node.InitMethod != nil {
-		st.processMethod(node.InitMethod, spellbookScope, spellbook)
+		st.processMethod(node.InitMethod, GrimoireScope, Grimoire)
 	}
 }
 
@@ -161,11 +161,11 @@ func extractPositionFromToken(tok token.Token) struct{ Line, Column int } {
 	return struct{ Line, Column int }{Line: 0, Column: 0}
 }
 
-// processMethod processes a method definition within a spellbook
+// processMethod processes a method definition within a Grimoire
 func (st *SymbolTable) processMethod(
 	node *ast.FunctionDefinition,
 	scope *Scope,
-	spellbook *SpellbookSymbol,
+	Grimoire *GrimoireSymbol,
 ) {
 	methodName := node.Name.Value
 	line := 0
@@ -197,7 +197,7 @@ func (st *SymbolTable) processMethod(
 	methodSymbol := &Symbol{
 		Name:             methodName,
 		Type:             "method",
-		SpellbookName:    spellbook.Name,
+		GrimoireName:     Grimoire.Name,
 		Parameters:       params,
 		DefinitionURI:    st.CurrentURI,
 		DefinitionLine:   line,
@@ -208,7 +208,7 @@ func (st *SymbolTable) processMethod(
 		methodSymbol.Documentation = node.DocString.Value
 	}
 
-	spellbook.Methods = append(spellbook.Methods, methodSymbol)
+	Grimoire.Methods = append(Grimoire.Methods, methodSymbol)
 
 	methodScope := &Scope{
 		Parent:    scope,
@@ -222,7 +222,7 @@ func (st *SymbolTable) processMethod(
 	selfSymbol := &Symbol{
 		Name:           "self",
 		Type:           "parameter",
-		SpellbookName:  spellbook.Name,
+		GrimoireName:   Grimoire.Name,
 		DefinitionURI:  st.CurrentURI,
 		DefinitionLine: line,
 	}
@@ -337,18 +337,18 @@ func (st *SymbolTable) processAssignStatement(node *ast.AssignStatement, scope *
 
 		varName := target.Value
 
-		if scope.Spellbook != nil {
+		if scope.Grimoire != nil {
 			fieldSymbol := &Symbol{
 				Name:             varName,
 				Type:             "field",
-				SpellbookName:    scope.Spellbook.Name,
+				GrimoireName:     scope.Grimoire.Name,
 				DefinitionURI:    st.CurrentURI,
 				DefinitionLine:   line,
 				DefinitionColumn: column,
 			}
 
 			scope.Symbols[varName] = fieldSymbol
-			scope.Spellbook.Fields = append(scope.Spellbook.Fields, fieldSymbol)
+			scope.Grimoire.Fields = append(scope.Grimoire.Fields, fieldSymbol)
 		} else {
 			varSymbol := &Symbol{
 				Name:             varName,
@@ -365,10 +365,10 @@ func (st *SymbolTable) processAssignStatement(node *ast.AssignStatement, scope *
 			}
 
 			if node.Value != nil {
-				if spellbook, ok := node.Value.(*ast.CallExpression); ok {
-					if ident, ok := spellbook.Function.(*ast.Identifier); ok {
-						if sb, exists := st.Spellbooks[ident.Value]; exists {
-							varSymbol.SpellbookName = sb.Name
+				if Grimoire, ok := node.Value.(*ast.CallExpression); ok {
+					if ident, ok := Grimoire.Function.(*ast.Identifier); ok {
+						if sb, exists := st.Grimoires[ident.Value]; exists {
+							varSymbol.GrimoireName = sb.Name
 							varSymbol.Type = "instance"
 						}
 					}
@@ -507,17 +507,17 @@ func (st *SymbolTable) processStatementForSymbols(stmt ast.Statement, scope *Sco
 	}
 }
 
-// GetCurrentSpellbook returns the spellbook at the given position, if any
-func (st *SymbolTable) GetCurrentSpellbook(uri string, line int) *SpellbookSymbol {
+// GetCurrentGrimoire returns the Grimoire at the given position, if any
+func (st *SymbolTable) GetCurrentGrimoire(uri string, line int) *GrimoireSymbol {
 	fileScope, ok := st.FileScopes[uri]
 	if !ok {
 		return nil
 	}
 
 	for _, symbol := range fileScope.Symbols {
-		if symbol.Type == "spellbook" && symbol.Scope != nil && symbol.Scope.Spellbook != nil {
+		if symbol.Type == "Grimoire" && symbol.Scope != nil && symbol.Scope.Grimoire != nil {
 			if line >= symbol.DefinitionLine {
-				return symbol.Scope.Spellbook
+				return symbol.Scope.Grimoire
 			}
 		}
 	}
@@ -572,15 +572,15 @@ func (st *SymbolTable) GetGlobalSymbols() []*Symbol {
 		symbols = append(symbols, symbol)
 	}
 
-	for name, spellbook := range st.Spellbooks {
+	for name, Grimoire := range st.Grimoires {
 		for _, fileScope := range st.FileScopes {
-			if symbol, ok := fileScope.Symbols[name]; ok && symbol.Type == "spellbook" {
+			if symbol, ok := fileScope.Symbols[name]; ok && symbol.Type == "Grimoire" {
 				symbols = append(symbols, symbol)
 				break
 			}
 		}
 
-		for _, method := range spellbook.Methods {
+		for _, method := range Grimoire.Methods {
 			symbols = append(symbols, method)
 		}
 	}
@@ -628,11 +628,11 @@ func (st *SymbolTable) lookupSymbolInScope(name string, scope *Scope) *Symbol {
 	return nil
 }
 
-// LookupSpellbook finds a spellbook by name
-func (st *SymbolTable) LookupSpellbook(name string) *SpellbookSymbol {
-	spellbook, ok := st.Spellbooks[name]
+// LookupGrimoire finds a Grimoire by name
+func (st *SymbolTable) LookupGrimoire(name string) *GrimoireSymbol {
+	Grimoire, ok := st.Grimoires[name]
 	if !ok {
 		return nil
 	}
-	return spellbook
+	return Grimoire
 }

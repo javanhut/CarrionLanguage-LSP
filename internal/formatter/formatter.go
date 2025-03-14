@@ -3,13 +3,12 @@ package formatter
 import (
 	"strings"
 
-	"github.com/carrionlang-lsp/lsp/internal/protocol"
-	"github.com/carrionlang-lsp/lsp/internal/util"
-
 	"github.com/javanhut/TheCarrionLanguage/src/lexer"
 	"github.com/javanhut/TheCarrionLanguage/src/parser"
-
 	lsp "go.lsp.dev/protocol"
+
+	"github.com/carrionlang-lsp/lsp/internal/protocol"
+	"github.com/carrionlang-lsp/lsp/internal/util"
 )
 
 // CarrionFormatter provides formatting services for Carrion files
@@ -84,7 +83,7 @@ type formatterContext struct {
 	indentLevel      int
 	indentStr        string
 	output           *strings.Builder
-	inSpellbook      bool
+	inGrimoire       bool
 	inSpell          bool
 	lastLineEmpty    bool
 	lastLineIndented bool
@@ -98,7 +97,7 @@ func (f *CarrionFormatter) formatDocument(text string) string {
 		indentLevel:   0,
 		indentStr:     "    ", // 4 spaces for indentation
 		output:        &strings.Builder{},
-		inSpellbook:   false,
+		inGrimoire:    false,
 		inSpell:       false,
 		lastLineEmpty: false,
 		blockStack:    make([]string, 0),
@@ -142,8 +141,8 @@ func (f *CarrionFormatter) formatLine(
 	isStart := isBlockStart(trimmedLine)
 	isEnd := isBlockEnd(trimmedLine)
 
-	// Determine if this is a spellbook or spell declaration
-	isSpellbook := strings.HasPrefix(trimmedLine, "spellbook ")
+	// Determine if this is a Grimoire or spell declaration
+	isGrimoire := strings.HasPrefix(trimmedLine, "Grimoire ")
 	isSpell := strings.HasPrefix(trimmedLine, "spell ")
 
 	// Determine if this is a control flow statement
@@ -160,24 +159,24 @@ func (f *CarrionFormatter) formatLine(
 		}
 	}
 
-	// Special formatting for spellbook and spell declarations
-	if isSpellbook {
-		// Start of a spellbook - reset to base level
-		ctx.inSpellbook = true
+	// Special formatting for Grimoire and spell declarations
+	if isGrimoire {
+		// Start of a Grimoire - reset to base level
+		ctx.inGrimoire = true
 		ctx.indentLevel = 0
 
-		// Add empty line before spellbook unless it's the first line
+		// Add empty line before Grimoire unless it's the first line
 		if lineNum > 0 && !ctx.lastLineEmpty {
 			ctx.output.WriteString("\n")
 		}
 	} else if isSpell {
-		// Add empty line between spells in a spellbook
+		// Add empty line between spells in a Grimoire
 		if ctx.inSpell && !ctx.lastLineEmpty {
 			ctx.output.WriteString("\n")
 		}
 
-		// Spells inside a spellbook should be indented one level
-		if ctx.inSpellbook {
+		// Spells inside a Grimoire should be indented one level
+		if ctx.inGrimoire {
 			ctx.indentLevel = 1
 		} else {
 			ctx.indentLevel = 0
@@ -212,7 +211,7 @@ func (f *CarrionFormatter) formatLine(
 
 	// Handle spacing between different sections
 	trimmedNextLine := strings.TrimSpace(nextLine)
-	if isSpell && ctx.inSpellbook && isSpell && trimmedNextLine != "" &&
+	if isSpell && ctx.inGrimoire && isSpell && trimmedNextLine != "" &&
 		!strings.HasPrefix(trimmedNextLine, "spell ") {
 		// Add a blank line after spell definition if the next line isn't empty or another spell
 		ctx.output.WriteString("\n")
@@ -222,8 +221,8 @@ func (f *CarrionFormatter) formatLine(
 
 // getBlockType determines the type of block being started
 func getBlockType(line string) string {
-	if strings.HasPrefix(line, "spellbook ") {
-		return "spellbook"
+	if strings.HasPrefix(line, "Grimoire ") {
+		return "Grimoire"
 	} else if strings.HasPrefix(line, "spell ") {
 		return "spell"
 	} else if strings.HasPrefix(line, "if ") {
@@ -292,7 +291,7 @@ func isBlockStart(line string) bool {
 	}
 
 	blockStarters := []string{
-		"if ", "otherwise", "else:", "for ", "while ", "spell ", "spellbook ", "attempt:",
+		"if ", "otherwise", "else:", "for ", "while ", "spell ", "Grimoire ", "attempt:",
 		"ensnare", "resolve:", "match ", "case ", "init",
 	}
 
@@ -308,7 +307,7 @@ func isBlockStart(line string) bool {
 // isBlockEnd returns true if the line ends a block
 func isBlockEnd(line string) bool {
 	blockEnders := []string{
-		"}", "end", "endif", "endspell", "endspellbook", "endfor", "endwhile",
+		"}", "end", "endif", "endspell", "endGrimoire", "endfor", "endwhile",
 		"endattempt", "endensnare", "endresolve", "endmatch", "endcase",
 	}
 
@@ -406,7 +405,7 @@ func formatColons(line string) string {
 			if wordStart <= prevWordStart {
 				word := line[wordStart : prevWordStart+1]
 				blockWords := []string{
-					"if", "else", "for", "while", "spell", "spellbook",
+					"if", "else", "for", "while", "spell", "grim",
 					"attempt", "ensnare", "resolve", "match", "case", "init",
 				}
 

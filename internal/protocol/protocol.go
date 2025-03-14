@@ -1,8 +1,9 @@
 package protocol
 
 import (
-	"github.com/carrionlang-lsp/lsp/internal/util"
 	lsp "go.lsp.dev/protocol"
+
+	"github.com/carrionlang-lsp/lsp/internal/util"
 )
 
 // CarrionDocument represents a Carrion source file that is being edited
@@ -98,12 +99,12 @@ var DiagnosticSeverity = map[string]lsp.DiagnosticSeverity{
 
 // CompletionItemKind maps Carrion symbol types to LSP completion item kinds
 var CompletionItemKind = map[string]lsp.CompletionItemKind{
-	"keyword":   lsp.CompletionItemKindKeyword,
-	"spellbook": lsp.CompletionItemKindClass,
-	"spell":     lsp.CompletionItemKindFunction,
-	"variable":  lsp.CompletionItemKindVariable,
-	"field":     lsp.CompletionItemKindField,
-	"method":    lsp.CompletionItemKindMethod,
-	"const":     lsp.CompletionItemKindConstant,
-	"import":    lsp.CompletionItemKindModule,
+	"keyword":  lsp.CompletionItemKindKeyword,
+	"grim":     lsp.CompletionItemKindClass,
+	"spell":    lsp.CompletionItemKindFunction,
+	"variable": lsp.CompletionItemKindVariable,
+	"field":    lsp.CompletionItemKindField,
+	"method":   lsp.CompletionItemKindMethod,
+	"const":    lsp.CompletionItemKindConstant,
+	"import":   lsp.CompletionItemKindModule,
 }

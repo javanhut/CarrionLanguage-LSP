@@ -135,7 +135,7 @@ if exists("b:current_syntax")
 endif
 
 " Keywords
-syntax keyword carrionKeyword spell spellbook init self if else otherwise
+syntax keyword carrionKeyword spell grim init self if else otherwise
 syntax keyword carrionKeyword for in while stop skip ignore return import
 syntax keyword carrionKeyword match case attempt resolve ensnare raise as
 syntax keyword carrionKeyword arcane arcanespell super check and or not
@@ -189,7 +189,7 @@ nvim example.crl
 
 ```
 // Example Carrion code
-spellbook Calculator:
+grim Calculator:
     init:
         self.result = 0
         

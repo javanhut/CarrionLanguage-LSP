@@ -4,14 +4,13 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/javanhut/TheCarrionLanguage/src/lexer"
+	"github.com/javanhut/TheCarrionLanguage/src/parser"
+	lsp "go.lsp.dev/protocol"
+
 	"github.com/carrionlang-lsp/lsp/internal/protocol"
 	"github.com/carrionlang-lsp/lsp/internal/symbols"
 	"github.com/carrionlang-lsp/lsp/internal/util"
-
-	"github.com/javanhut/TheCarrionLanguage/src/lexer"
-	"github.com/javanhut/TheCarrionLanguage/src/parser"
-
-	lsp "go.lsp.dev/protocol"
 )
 
 // CarrionAnalyzer provides language analysis for Carrion language files
@@ -148,7 +147,7 @@ func (a *CarrionAnalyzer) GetCompletions(
 	if isDotCompletion {
 		// Add method/field completions for the object
 		if objectName == "self" {
-			// Handle self completions (methods and fields of current spellbook)
+			// Handle self completions (methods and fields of current Grimoire)
 			selfCompletions := a.getSelfCompletions(uri, position)
 			completionItems = append(completionItems, selfCompletions...)
 		} else {
@@ -165,7 +164,7 @@ func (a *CarrionAnalyzer) GetCompletions(
 		localCompletions := a.getLocalCompletions(uri, position)
 		completionItems = append(completionItems, localCompletions...)
 
-		// Add global completions (spellbooks, etc.)
+		// Add global completions (Grimoires, etc.)
 		globalCompletions := a.getGlobalCompletions()
 		completionItems = append(completionItems, globalCompletions...)
 	}
@@ -178,30 +177,30 @@ func (a *CarrionAnalyzer) getSelfCompletions(
 	uri lsp.DocumentURI,
 	position lsp.Position,
 ) []lsp.CompletionItem {
-	// Find current spellbook context
-	currentSpellbook := a.symbolTable.GetCurrentSpellbook(string(uri), int(position.Line))
-	if currentSpellbook == nil {
+	// Find current Grimoire context
+	currentGrimoire := a.symbolTable.GetCurrentGrimoire(string(uri), int(position.Line))
+	if currentGrimoire == nil {
 		return nil
 	}
 
 	completions := []lsp.CompletionItem{}
 
-	// Add spellbook methods
-	for _, method := range currentSpellbook.Methods {
+	// Add Grimoire methods
+	for _, method := range currentGrimoire.Methods {
 		completions = append(completions, lsp.CompletionItem{
 			Label:         method.Name,
 			Kind:          lsp.CompletionItemKindMethod,
-			Detail:        "method of " + currentSpellbook.Name,
+			Detail:        "method of " + currentGrimoire.Name,
 			Documentation: method.Documentation,
 		})
 	}
 
-	// Add spellbook fields
-	for _, field := range currentSpellbook.Fields {
+	// Add Grimoire fields
+	for _, field := range currentGrimoire.Fields {
 		completions = append(completions, lsp.CompletionItem{
 			Label:         field.Name,
 			Kind:          lsp.CompletionItemKindField,
-			Detail:        "field of " + currentSpellbook.Name,
+			Detail:        "field of " + currentGrimoire.Name,
 			Documentation: field.Documentation,
 		})
 	}
@@ -222,26 +221,26 @@ func (a *CarrionAnalyzer) getObjectCompletions(
 
 	completions := []lsp.CompletionItem{}
 
-	// Get the object's type (spellbook)
+	// Get the object's type (Grimoire)
 	if symbol.Type == "instance" || symbol.Type == "variable" {
-		spellbook := a.symbolTable.LookupSpellbook(symbol.SpellbookName)
-		if spellbook != nil {
+		Grimoire := a.symbolTable.LookupGrimoire(symbol.GrimoireName)
+		if Grimoire != nil {
 			// Add methods
-			for _, method := range spellbook.Methods {
+			for _, method := range Grimoire.Methods {
 				completions = append(completions, lsp.CompletionItem{
 					Label:         method.Name,
 					Kind:          lsp.CompletionItemKindMethod,
-					Detail:        "method of " + spellbook.Name,
+					Detail:        "method of " + Grimoire.Name,
 					Documentation: method.Documentation,
 				})
 			}
 
 			// Add fields
-			for _, field := range spellbook.Fields {
+			for _, field := range Grimoire.Fields {
 				completions = append(completions, lsp.CompletionItem{
 					Label:         field.Name,
 					Kind:          lsp.CompletionItemKindField,
-					Detail:        "field of " + spellbook.Name,
+					Detail:        "field of " + Grimoire.Name,
 					Documentation: field.Documentation,
 				})
 			}
@@ -254,7 +253,7 @@ func (a *CarrionAnalyzer) getObjectCompletions(
 // getKeywordCompletions returns Carrion language keyword completions
 func (a *CarrionAnalyzer) getKeywordCompletions() []lsp.CompletionItem {
 	keywords := []string{
-		"spell", "spellbook", "init", "self", "if", "else", "otherwise",
+		"spell", "Grimoire", "init", "self", "if", "else", "otherwise",
 		"for", "in", "while", "stop", "skip", "ignore", "return",
 		"import", "match", "case", "attempt", "resolve", "ensnare",
 		"raise", "as", "arcane", "arcanespell", "super",
@@ -290,8 +289,8 @@ func (a *CarrionAnalyzer) getLocalCompletions(
 		}
 
 		detail := symbol.Type
-		if symbol.SpellbookName != "" {
-			detail = detail + " of " + symbol.SpellbookName
+		if symbol.GrimoireName != "" {
+			detail = detail + " of " + symbol.GrimoireName
 		}
 
 		completions = append(completions, lsp.CompletionItem{
@@ -307,7 +306,7 @@ func (a *CarrionAnalyzer) getLocalCompletions(
 
 // getGlobalCompletions returns global symbol completions
 func (a *CarrionAnalyzer) getGlobalCompletions() []lsp.CompletionItem {
-	// Get all spellbooks and global functions from the symbol table
+	// Get all Grimoires and global functions from the symbol table
 	globals := a.symbolTable.GetGlobalSymbols()
 
 	completions := []lsp.CompletionItem{}
@@ -316,7 +315,7 @@ func (a *CarrionAnalyzer) getGlobalCompletions() []lsp.CompletionItem {
 		var kind lsp.CompletionItemKind
 
 		switch symbol.Type {
-		case "spellbook":
+		case "Grimoire":
 			kind = lsp.CompletionItemKindClass
 		case "spell":
 			kind = lsp.CompletionItemKindFunction
@@ -472,8 +471,8 @@ func (a *CarrionAnalyzer) GetHoverInfo(uri lsp.DocumentURI, position lsp.Positio
 	// Create hover content based on symbol type
 	var content string
 	switch symbol.Type {
-	case "spellbook":
-		content = fmt.Sprintf("**spellbook** %s\n\n%s", symbol.Name, symbol.Documentation)
+	case "Grimoire":
+		content = fmt.Sprintf("**Grimoire** %s\n\n%s", symbol.Name, symbol.Documentation)
 	case "spell":
 		var params string
 		if symbol.Parameters != nil {
@@ -495,7 +494,7 @@ func (a *CarrionAnalyzer) GetHoverInfo(uri lsp.DocumentURI, position lsp.Positio
 		content = fmt.Sprintf(
 			"**field** %s of %s\n\n%s",
 			symbol.Name,
-			symbol.SpellbookName,
+			symbol.GrimoireName,
 			symbol.Documentation,
 		)
 	case "method":
@@ -509,7 +508,7 @@ func (a *CarrionAnalyzer) GetHoverInfo(uri lsp.DocumentURI, position lsp.Positio
 		}
 		content = fmt.Sprintf(
 			"**method** %s.%s(%s)\n\n%s",
-			symbol.SpellbookName,
+			symbol.GrimoireName,
 			symbol.Name,
 			params,
 			symbol.Documentation,
@@ -535,7 +534,7 @@ func formatDocumentation(content string) lsp.MarkupContent {
 // isCarrionKeyword checks if a string is a Carrion language keyword
 func isCarrionKeyword(word string) bool {
 	keywords := map[string]bool{
-		"spell": true, "spellbook": true, "init": true, "self": true,
+		"spell": true, "grim": true, "init": true, "self": true,
 		"if": true, "else": true, "otherwise": true, "for": true,
 		"in": true, "while": true, "stop": true, "skip": true,
 		"ignore": true, "return": true, "import": true, "match": true,
@@ -552,9 +551,9 @@ func isCarrionKeyword(word string) bool {
 func formatKeywordDocumentation(keyword string) string {
 	docs := map[string]string{
 		"spell":       "**spell** - Defines a function in Carrion.",
-		"spellbook":   "**spellbook** - Defines a class in Carrion.",
-		"init":        "**init** - Special method for initializing a spellbook instance.",
-		"self":        "**self** - References the current instance within a spellbook method.",
+		"grim":        "**Grimoire** - Defines a class in Carrion.",
+		"init":        "**init** - Special method for initializing a Grimoire instance.",
+		"self":        "**self** - References the current instance within a Grimoire method.",
 		"if":          "**if** - Conditional statement that executes a block if the condition is true.",
 		"else":        "**else** - Alternative block of an if statement.",
 		"otherwise":   "**otherwise** - Alternative condition in an if-chain (similar to 'else if').",
@@ -573,9 +572,9 @@ func formatKeywordDocumentation(keyword string) string {
 		"ensnare":     "**ensnare** - Catches exceptions in an attempt block (similar to 'catch').",
 		"raise":       "**raise** - Throws an exception.",
 		"as":          "**as** - Alias for imports or caught exceptions.",
-		"arcane":      "**arcane** - Defines an abstract spellbook (similar to 'abstract class').",
-		"arcanespell": "**arcanespell** - Defines an abstract method in a spellbook.",
-		"super":       "**super** - References the parent spellbook's implementation.",
+		"arcane":      "**arcane** - Defines an abstract Grimoire (similar to 'abstract class').",
+		"arcanespell": "**arcanespell** - Defines an abstract method in a Grimoire.",
+		"super":       "**super** - References the parent Grimoire's implementation.",
 		"check":       "**check** - Assertion statement.",
 		"True":        "**True** - Boolean true value.",
 		"False":       "**False** - Boolean false value.",
