@@ -76,9 +76,25 @@ Choose your editor below for specific setup instructions.
 
 ## Editor Integration
 
-### 🎯 Neovim (Recommended)
+### 🎯 Neovim with NvChad (Recommended for Beginners)
 
-#### 🚀 Ultra-Quick Setup
+#### 🚀 One-Command Install
+
+**For complete beginners with NvChad:**
+```bash
+curl -fsSL https://raw.githubusercontent.com/carrionlang/carrion-lsp/main/install-nvchad.sh | bash
+```
+
+**Manual install:**
+```bash
+git clone https://github.com/javanhut/CarrionLanguage-LSP.git
+cd CarrionLanguage-LSP
+./install-nvchad.sh
+```
+
+**📖 Complete NvChad Setup Guide**: [NVCHAD_SETUP.md](NVCHAD_SETUP.md)
+
+#### 🚀 Advanced/Manual Neovim Setup
 
 **1. Install LSP:**
 ```bash

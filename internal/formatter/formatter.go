@@ -204,11 +204,17 @@ func (f *CarrionFormatter) formatLine(
 	isEnd := isBlockEnd(trimmedLine)
 
 	// Determine if this is a Grimoire or spell declaration
-	isGrimoire := strings.HasPrefix(trimmedLine, "Grimoire ")
+	isGrimoire := strings.HasPrefix(trimmedLine, "grim ")
 	isSpell := strings.HasPrefix(trimmedLine, "spell ")
 
 	// Determine if this is a control flow statement
 	isControlFlow := isControlFlowStart(trimmedLine)
+
+	// Check if this line should exit spell context (top-level statements)
+	isTopLevelStatement := !isGrimoire && !isSpell && !isControlFlow && !isStart && !isEnd && 
+		!strings.HasPrefix(trimmedLine, "return ") && !strings.HasPrefix(trimmedLine, "ignore") &&
+		!strings.HasPrefix(trimmedLine, "#") && !strings.HasPrefix(trimmedLine, "```") &&
+		(strings.Contains(trimmedLine, "=") || strings.Contains(trimmedLine, "("))
 
 	// Handle indentation adjustments before writing the line
 	if isEnd && !isStart {
@@ -248,6 +254,14 @@ func (f *CarrionFormatter) formatLine(
 	} else if isControlFlow && ctx.inSpell {
 		// Control flow statements follow the current indent level
 		// No adjustment needed as they will be properly indented
+	} else if isTopLevelStatement && ctx.inSpell {
+		// This is a top-level statement, exit spell context
+		ctx.inSpell = false
+		if ctx.inGrimoire {
+			ctx.indentLevel = 0  // Return to grimoire level
+		} else {
+			ctx.indentLevel = 0  // Return to global level
+		}
 	}
 
 	// Apply current indentation level
@@ -283,8 +297,8 @@ func (f *CarrionFormatter) formatLine(
 
 // getBlockType determines the type of block being started
 func getBlockType(line string) string {
-	if strings.HasPrefix(line, "Grimoire ") {
-		return "Grimoire"
+	if strings.HasPrefix(line, "grim ") {
+		return "grim"
 	} else if strings.HasPrefix(line, "spell ") {
 		return "spell"
 	} else if strings.HasPrefix(line, "if ") {
@@ -353,7 +367,7 @@ func isBlockStart(line string) bool {
 	}
 
 	blockStarters := []string{
-		"if ", "otherwise", "else:", "for ", "while ", "spell ", "Grimoire ", "attempt:",
+		"if ", "otherwise", "else:", "for ", "while ", "spell ", "grim ", "attempt:",
 		"ensnare", "resolve:", "match ", "case ", "init",
 	}
 

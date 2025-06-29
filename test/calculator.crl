@@ -1,0 +1,27 @@
+```
+This is a calculator grimoire to test full functionality of carrion interpreter
+```
+
+grim Calculator:
+    init():
+        ignore
+
+    spell add(a, b):
+        return a + b
+
+    spell sub(a, b):
+        return a - b
+
+    spell mult(a, b):
+        return a * b
+
+    spell div(a, b):
+        return a // b
+
+calc = Calculator()
+a, b = (10, 20)
+
+print(f"Adding {a} and {b} values: {calc.add(a, b)}")
+
+spell print_hello():
+    print("hello")

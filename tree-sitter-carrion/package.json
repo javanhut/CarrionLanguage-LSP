@@ -1,0 +1,28 @@
+{
+  "name": "tree-sitter-carrion",
+  "version": "0.1.0",
+  "description": "Tree-sitter grammar for the Carrion programming language",
+  "main": "bindings/node",
+  "keywords": [
+    "tree-sitter",
+    "carrion",
+    "grammar",
+    "parser"
+  ],
+  "author": "Carrion Language Team",
+  "license": "MIT",
+  "dependencies": {
+    "nan": "^2.14.0"
+  },
+  "devDependencies": {
+    "tree-sitter-cli": "^0.20.0"
+  },
+  "tree-sitter": [
+    {
+      "scope": "source.carrion",
+      "file-types": [
+        "crl"
+      ]
+    }
+  ]
+}

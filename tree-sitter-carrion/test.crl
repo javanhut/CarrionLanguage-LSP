@@ -1,0 +1,6 @@
+grim Calculator:
+    spell add(x, y):
+        return x + y
+
+calc = Calculator()
+print(calc.add(5, 3))
