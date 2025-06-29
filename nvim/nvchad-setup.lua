@@ -97,9 +97,7 @@ return {
     config = function()
       -- Command to install Carrion LSP
       vim.api.nvim_create_user_command("CarrionInstall", function()
-        local notify = require("nvchad.utils").notify
-        
-        notify("Installing Carrion LSP...", vim.log.levels.INFO)
+        vim.notify("Installing Carrion LSP...", vim.log.levels.INFO)
         
         local install_script = [[
           #!/bin/bash
@@ -170,7 +168,6 @@ return {
 
       -- Command to check status
       vim.api.nvim_create_user_command("CarrionStatus", function()
-        local notify = require("nvchad.utils").notify
         
         -- Check LSP
         local lsp_handle = io.popen("which carrion-lsp 2>/dev/null")
@@ -208,7 +205,7 @@ return {
           table.insert(status, "All components are installed!")
         end
         
-        notify(table.concat(status, "\n"), vim.log.levels.INFO)
+        vim.notify(table.concat(status, "\n"), vim.log.levels.INFO)
       end, { desc = "Check Carrion language support status" })
 
       -- Auto-install treesitter parser on first .crl file
@@ -218,8 +215,7 @@ return {
           local parsers = require("nvim-treesitter.parsers")
           if not parsers.has_parser("carrion") then
             vim.schedule(function()
-              local notify = require("nvchad.utils").notify
-              notify(
+              vim.notify(
                 "Installing Carrion Treesitter parser...",
                 vim.log.levels.INFO
               )
