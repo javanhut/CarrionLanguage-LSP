@@ -227,21 +227,6 @@ return {
     end,
   },
 
-  -- Formatting support
-  {
-    "stevearc/conform.nvim",
-    opts = function(_, opts)
-      opts.formatters_by_ft = opts.formatters_by_ft or {}
-      opts.formatters_by_ft.carrion = { "carrion_lsp" }
-      
-      opts.formatters = opts.formatters or {}
-      opts.formatters.carrion_lsp = {
-        command = "carrion-lsp",
-        args = { "--format" },
-        stdin = true,
-      }
-      
-      return opts
-    end,
-  },
+  -- Note: Formatting is handled by the LSP server through textDocument/formatting
+  -- No external formatter needed as carrion-lsp provides formatting via LSP protocol
 }
