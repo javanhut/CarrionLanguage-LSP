@@ -1,11 +1,11 @@
 module github.com/carrionlang-lsp/lsp
 
-go 1.23
+go 1.23.0
 
-toolchain go1.23.2
+toolchain go1.24.2
 
 require (
-	github.com/javanhut/TheCarrionLanguage v0.1.5
+	github.com/javanhut/TheCarrionLanguage v0.1.6
 	go.lsp.dev/jsonrpc2 v0.10.0
 	go.lsp.dev/protocol v0.12.0
 )
@@ -18,5 +18,5 @@ require (
 	go.uber.org/atomic v1.9.0 // indirect
 	go.uber.org/multierr v1.8.0 // indirect
 	go.uber.org/zap v1.21.0 // indirect
-	golang.org/x/sys v0.16.0 // indirect
+	golang.org/x/sys v0.33.0 // indirect
 )

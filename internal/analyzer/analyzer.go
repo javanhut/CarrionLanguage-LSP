@@ -2,8 +2,10 @@ package analyzer
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
+	"github.com/javanhut/TheCarrionLanguage/src/ast"
 	"github.com/javanhut/TheCarrionLanguage/src/lexer"
 	"github.com/javanhut/TheCarrionLanguage/src/parser"
 	lsp "go.lsp.dev/protocol"
@@ -50,49 +52,16 @@ func (a *CarrionAnalyzer) AnalyzeDocument(uri lsp.DocumentURI) []lsp.Diagnostic 
 
 	if len(p.Errors()) > 0 {
 		for _, err := range p.Errors() {
-			// Extract line and column information if available
-			lineNum, colNum := 1, 1
-			errMsg := err
-
-			// Try to extract line/column info using a simple heuristic
-			// This would be more robust in a real implementation
-			if parts := strings.Split(err, " at line "); len(parts) > 1 {
-				if locParts := strings.Split(parts[1], ", column "); len(locParts) > 1 {
-					lineNumStr := locParts[0]
-					colNumStr := strings.Split(locParts[1], " ")[0]
-
-					// Attempt to parse as integers
-					if ln, err := util.ParseInt(lineNumStr); err == nil {
-						lineNum = ln
-					}
-					if cn, err := util.ParseInt(colNumStr); err == nil {
-						colNum = cn
-					}
-
-					// Clean up the error message
-					errMsg = parts[0]
-				}
-			}
-
-			// Create a diagnostic for the error
-			diagnostic := lsp.Diagnostic{
-				Range: lsp.Range{
-					Start: lsp.Position{
-						Line:      uint32(lineNum - 1),
-						Character: uint32(colNum - 1),
-					},
-					End: lsp.Position{
-						Line:      uint32(lineNum - 1),
-						Character: uint32(colNum + 10), // Estimate end position
-					},
-				},
-				Severity: protocol.DiagnosticSeverity["error"],
-				Source:   "carrion-lsp",
-				Message:  errMsg,
-			}
-
+			diagnostic := a.createDiagnosticFromError(err)
 			diagnostics = append(diagnostics, diagnostic)
 		}
+	}
+
+	// Additional semantic analysis when parsing succeeds
+	if len(p.Errors()) == 0 && program != nil {
+		// Check for undefined variables, unused imports, etc.
+		semanticDiagnostics := a.performSemanticAnalysis(program, doc)
+		diagnostics = append(diagnostics, semanticDiagnostics...)
 	}
 
 	// Build symbol table for the document
@@ -159,6 +128,10 @@ func (a *CarrionAnalyzer) GetCompletions(
 		// Add keyword completions
 		keywordCompletions := a.getKeywordCompletions()
 		completionItems = append(completionItems, keywordCompletions...)
+
+		// Add built-in function completions
+		builtinCompletions := a.getBuiltinCompletions()
+		completionItems = append(completionItems, builtinCompletions...)
 
 		// Add local variable completions
 		localCompletions := a.getLocalCompletions(uri, position)
@@ -253,7 +226,7 @@ func (a *CarrionAnalyzer) getObjectCompletions(
 // getKeywordCompletions returns Carrion language keyword completions
 func (a *CarrionAnalyzer) getKeywordCompletions() []lsp.CompletionItem {
 	keywords := []string{
-		"spell", "Grimoire", "init", "self", "if", "else", "otherwise",
+		"spell", "grim", "init", "self", "if", "else", "otherwise",
 		"for", "in", "while", "stop", "skip", "ignore", "return",
 		"import", "match", "case", "attempt", "resolve", "ensnare",
 		"raise", "as", "arcane", "arcanespell", "super",
@@ -266,6 +239,40 @@ func (a *CarrionAnalyzer) getKeywordCompletions() []lsp.CompletionItem {
 		completions = append(completions, lsp.CompletionItem{
 			Label: keyword,
 			Kind:  lsp.CompletionItemKindKeyword,
+		})
+	}
+
+	return completions
+}
+
+// getBuiltinCompletions returns built-in function completions
+func (a *CarrionAnalyzer) getBuiltinCompletions() []lsp.CompletionItem {
+	builtins := []struct {
+		name   string
+		detail string
+		doc    string
+	}{
+		{"len", "len(object) -> int", "Returns the length of a string, array, tuple, or hash"},
+		{"print", "print(...args)", "Prints arguments to stdout"},
+		{"input", "input(prompt?: string) -> string", "Reads user input from stdin"},
+		{"int", "int(value) -> int", "Converts a value to an integer"},
+		{"float", "float(value) -> float", "Converts a value to a float"},
+		{"str", "str(value) -> string", "Converts a value to a string"},
+		{"type", "type(object) -> string", "Returns the type of an object"},
+		{"enumerate", "enumerate(iterable) -> array", "Returns an array of [index, value] pairs"},
+		{"help", "help() -> string", "Returns help information"},
+		{"version", "version() -> string", "Returns version information"},
+		{"modules", "modules() -> string", "Lists available modules"},
+	}
+
+	completions := []lsp.CompletionItem{}
+
+	for _, builtin := range builtins {
+		completions = append(completions, lsp.CompletionItem{
+			Label:         builtin.name,
+			Kind:          lsp.CompletionItemKindFunction,
+			Detail:        builtin.detail,
+			Documentation: builtin.doc,
 		})
 	}
 
@@ -589,4 +596,259 @@ func formatKeywordDocumentation(keyword string) string {
 	}
 
 	return fmt.Sprintf("**%s** - Carrion keyword", keyword)
+}
+
+// createDiagnosticFromError creates a diagnostic from a parser error
+func (a *CarrionAnalyzer) createDiagnosticFromError(err string) lsp.Diagnostic {
+	// Extract line and column information if available
+	lineNum, colNum := 1, 1
+	errMsg := err
+
+	// Try to extract line/column info using a simple heuristic
+	if parts := strings.Split(err, " at line "); len(parts) > 1 {
+		if locParts := strings.Split(parts[1], ", column "); len(locParts) > 1 {
+			lineNumStr := locParts[0]
+			colNumStr := strings.Split(locParts[1], " ")[0]
+
+			// Attempt to parse as integers
+			if ln, err := strconv.Atoi(lineNumStr); err == nil {
+				lineNum = ln
+			}
+			if cn, err := strconv.Atoi(colNumStr); err == nil {
+				colNum = cn
+			}
+
+			// Clean up the error message
+			errMsg = parts[0]
+		}
+	}
+
+	// Create a diagnostic for the error
+	return lsp.Diagnostic{
+		Range: lsp.Range{
+			Start: lsp.Position{
+				Line:      uint32(lineNum - 1),
+				Character: uint32(colNum - 1),
+			},
+			End: lsp.Position{
+				Line:      uint32(lineNum - 1),
+				Character: uint32(colNum + 10), // Estimate end position
+			},
+		},
+		Severity: protocol.DiagnosticSeverity["error"],
+		Source:   "carrion-lsp",
+		Message:  errMsg,
+	}
+}
+
+// performSemanticAnalysis performs additional semantic checks on the AST
+func (a *CarrionAnalyzer) performSemanticAnalysis(program *ast.Program, doc *protocol.CarrionDocument) []lsp.Diagnostic {
+	diagnostics := []lsp.Diagnostic{}
+
+	// TODO: Implement semantic analysis
+	// - Check for undefined variables
+	// - Check for unused imports
+	// - Check for type mismatches
+	// - Check for unreachable code
+	// - etc.
+
+	return diagnostics
+}
+
+// GetSignatureHelp returns signature help for function calls
+func (a *CarrionAnalyzer) GetSignatureHelp(
+	uri lsp.DocumentURI,
+	position lsp.Position,
+) *lsp.SignatureHelp {
+	doc := a.documentStore.GetDocument(uri)
+	if doc == nil {
+		a.logger.Warn("Cannot get signature help for non-existent document: %s", uri)
+		return nil
+	}
+
+	// Get the current line
+	lines := strings.Split(doc.Text, "\n")
+	if int(position.Line) >= len(lines) {
+		return nil
+	}
+
+	line := lines[position.Line]
+	if int(position.Character) > len(line) {
+		return nil
+	}
+
+	// Find the function call context
+	funcName, paramIndex := a.getFunctionCallContext(line, position.Character)
+	if funcName == "" {
+		return nil
+	}
+
+	// Look up the function in the symbol table
+	symbol := a.symbolTable.LookupSymbol(funcName, string(uri))
+	if symbol == nil || (symbol.Type != "spell" && symbol.Type != "method") {
+		// Check if it's a built-in function
+		return a.getBuiltinSignatureHelp(funcName, paramIndex)
+	}
+
+	// Create signature information
+	params := make([]string, 0, len(symbol.Parameters))
+	paramInfos := make([]lsp.ParameterInformation, 0, len(symbol.Parameters))
+	
+	for _, param := range symbol.Parameters {
+		paramStr := param.Name
+		if param.TypeHint != "" {
+			paramStr += ": " + param.TypeHint
+		}
+		if param.DefaultValue != "" {
+			paramStr += " = " + param.DefaultValue
+		}
+		params = append(params, paramStr)
+		
+		paramInfos = append(paramInfos, lsp.ParameterInformation{
+			Label: paramStr,
+		})
+	}
+
+	signature := symbol.Name + "(" + strings.Join(params, ", ") + ")"
+	
+	return &lsp.SignatureHelp{
+		Signatures: []lsp.SignatureInformation{
+			{
+				Label:         signature,
+				Documentation: symbol.Documentation,
+				Parameters:    paramInfos,
+			},
+		},
+		ActiveSignature: 0,
+		ActiveParameter: uint32(paramIndex),
+	}
+}
+
+// getFunctionCallContext analyzes the current position to find function call context
+func (a *CarrionAnalyzer) getFunctionCallContext(line string, charPos uint32) (string, int) {
+	// Find the opening parenthesis
+	parenPos := -1
+	parenDepth := 0
+	
+	for i := int(charPos) - 1; i >= 0; i-- {
+		if line[i] == ')' {
+			parenDepth++
+		} else if line[i] == '(' {
+			if parenDepth == 0 {
+				parenPos = i
+				break
+			}
+			parenDepth--
+		}
+	}
+	
+	if parenPos == -1 {
+		return "", 0
+	}
+
+	// Extract function name before the parenthesis
+	nameEnd := parenPos - 1
+	for nameEnd >= 0 && line[nameEnd] == ' ' {
+		nameEnd--
+	}
+	
+	nameStart := nameEnd
+	for nameStart >= 0 && isIdentifierChar(line[nameStart]) {
+		nameStart--
+	}
+	nameStart++
+	
+	if nameStart > nameEnd {
+		return "", 0
+	}
+	
+	funcName := line[nameStart:nameEnd+1]
+	
+	// Count commas to determine parameter index
+	paramIndex := 0
+	for i := parenPos + 1; i < int(charPos); i++ {
+		if line[i] == ',' {
+			paramIndex++
+		}
+	}
+	
+	return funcName, paramIndex
+}
+
+// getBuiltinSignatureHelp returns signature help for built-in functions
+func (a *CarrionAnalyzer) getBuiltinSignatureHelp(funcName string, paramIndex int) *lsp.SignatureHelp {
+	builtinSigs := map[string]struct {
+		signature string
+		doc       string
+		params    []string
+	}{
+		"print": {
+			signature: "print(...args)",
+			doc:       "Prints arguments to stdout",
+			params:    []string{"...args"},
+		},
+		"len": {
+			signature: "len(object)",
+			doc:       "Returns the length of a string, array, tuple, or hash",
+			params:    []string{"object"},
+		},
+		"input": {
+			signature: "input(prompt?)",
+			doc:       "Reads user input from stdin",
+			params:    []string{"prompt?"},
+		},
+		"int": {
+			signature: "int(value)",
+			doc:       "Converts a value to an integer",
+			params:    []string{"value"},
+		},
+		"float": {
+			signature: "float(value)",
+			doc:       "Converts a value to a float",
+			params:    []string{"value"},
+		},
+		"str": {
+			signature: "str(value)",
+			doc:       "Converts a value to a string",
+			params:    []string{"value"},
+		},
+		"type": {
+			signature: "type(object)",
+			doc:       "Returns the type of an object",
+			params:    []string{"object"},
+		},
+		"enumerate": {
+			signature: "enumerate(iterable)",
+			doc:       "Returns an array of [index, value] pairs",
+			params:    []string{"iterable"},
+		},
+	}
+
+	if sig, ok := builtinSigs[funcName]; ok {
+		paramInfos := make([]lsp.ParameterInformation, 0, len(sig.params))
+		for _, param := range sig.params {
+			paramInfos = append(paramInfos, lsp.ParameterInformation{
+				Label: param,
+			})
+		}
+
+		activeParam := uint32(paramIndex)
+		if activeParam >= uint32(len(sig.params)) && len(sig.params) > 0 {
+			activeParam = uint32(len(sig.params) - 1)
+		}
+
+		return &lsp.SignatureHelp{
+			Signatures: []lsp.SignatureInformation{
+				{
+					Label:         sig.signature,
+					Documentation: sig.doc,
+					Parameters:    paramInfos,
+				},
+			},
+			ActiveSignature: 0,
+			ActiveParameter: activeParam,
+		}
+	}
+
+	return nil
 }

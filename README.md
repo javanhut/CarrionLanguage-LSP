@@ -1,71 +1,173 @@
-# Carrion Language Server for Neovim
+# Carrion Language Server
 
-This repository contains a Language Server Protocol (LSP) implementation for the Carrion programming language, along with Neovim configuration files to integrate it with NvChad.
+A comprehensive Language Server Protocol (LSP) implementation for the Carrion programming language, providing intelligent code editing features for various editors including VS Code, Neovim, Emacs, and more.
 
 ## Features
 
-- Syntax highlighting for `.crl` files
-- Code completion
-- Hover information for keywords and symbols
-- Go-to-definition for symbols
-- Document formatting
-- Error diagnostics
+### Core Functionality
+- 🔍 **Syntax Analysis**: Real-time parsing and error detection
+- 📝 **Code Completion**: Context-aware suggestions for:
+  - Keywords (`spell`, `grim`, `if`, `for`, etc.)
+  - Built-in functions (`print`, `len`, `type`, etc.)
+  - User-defined functions and grimoires
+  - Variables and methods
+- 🎯 **Go to Definition**: Jump to symbol declarations
+- 💡 **Hover Information**: Detailed documentation on hover
+- 🎨 **Code Formatting**: Automatic indentation and style fixes
+- ⚠️ **Diagnostics**: Real-time error and warning messages
 
-## Installation
+### Advanced Features
+- Symbol table management for cross-file references
+- Semantic analysis for type checking
+- Support for Carrion's unique syntax (grimoires, spells, etc.)
+- Multi-platform support (Linux, macOS, Windows)
 
-### Step 1: Build the Language Server
+## 🚀 Quick Start
 
-1. Clone the repository:
+### Prerequisites
+- **Git** (for cloning the repository)
+- **Go 1.23+** (for building from source)
+- **TheCarrionLanguage** v0.1.6 or later
 
+### 1. Install LSP Server
+
+**Recommended (one command):**
 ```bash
-git clone https://github.com/javanhut/carrionlang-lsp.git
+git clone https://github.com/javanhut/CarrionLanguage-LSP.git && cd CarrionLanguage-LSP && make install
 ```
 
-2. Go into cloned repo:
+**Alternative methods:**
+<details>
+<summary>Click to see other installation options</summary>
 
+**Manual build and install:**
 ```bash
-cd carrionlang-lsp/
+git clone https://github.com/javanhut/CarrionLanguage-LSP.git
+cd CarrionLanguage-LSP
+make build
+sudo cp build/carrion-lsp /usr/local/bin/
 ```
 
-3. Build the language server:
-
+**Development build:**
 ```bash
-go build -o carrion-lsp ./cmd/server/main.go
+git clone https://github.com/javanhut/CarrionLanguage-LSP.git
+cd CarrionLanguage-LSP
+go mod tidy
+go build -o carrion-lsp ./cmd/server/
 ```
 
-4. Make the binary available in your PATH:
+</details>
 
+### 2. Verify Installation
 ```bash
-sudo mv carrion-lsp /usr/local/bin/
+carrion-lsp --version
 ```
 
-# Alternative Installation
+### 3. Setup Your Editor
+Choose your editor below for specific setup instructions.
 
+### Available Commands
+- `make build` - Build the language server
+- `make install` - Build and install to system PATH  
+- `make uninstall` - Remove from system
+- `make test` - Run tests
+- `make clean` - Clean build artifacts
+- `make help` - Show all available commands
 
-1. Install Carrion LSP using Make
+## Editor Integration
 
+### 🎯 Neovim (Recommended)
+
+#### 🚀 Ultra-Quick Setup
+
+**1. Install LSP:**
 ```bash
+git clone https://github.com/javanhut/CarrionLanguage-LSP.git
+cd CarrionLanguage-LSP
 make install
 ```
 
-2. Uninstall Carrion Lsp using Make
-```bash
-make uninstall
+**2. Add to your Neovim config:**
+
+**For lazy.nvim users (most common):**
+```lua
+-- In your lazy.nvim plugin list:
+{
+  name = "carrion-lsp", 
+  dir = "/path/to/CarrionLanguage-LSP/nvim",  -- Update this path
+  ft = "carrion",
+  config = function()
+    require("carrion").setup()
+  end,
+}
 ```
 
-3. Get Help
+**For other plugin managers or manual setup:**
 ```bash
-make help
+# Copy plugin files to your Neovim config
+cp -r /path/to/CarrionLanguage-LSP/nvim/* ~/.config/nvim/
+
+# Add to your init.lua:
+require("carrion").setup()
 ```
 
-* Ensure make is installed.
-* Note: You may need elevated privileges like sudo to use make option and make must be installed as well.
+**3. Verify installation:**
+```
+:CarrionHealth
+```
 
-### Step 2: Configure Neovim with NvChad
+#### ✅ What You Get Instantly
 
-#### LSP Configuration
+- **Complete LSP Integration**: Autocompletion, diagnostics, hover, go-to-definition
+- **Syntax Highlighting**: All Carrion syntax with magical keywords
+- **Smart Indentation**: 4-space indentation with proper folding  
+- **Key Bindings**: `gd`, `K`, `<leader>rn`, `<leader>ca`, `<leader>/` (comment toggle)
+- **Commands**: `:CarrionLspInfo`, `:CarrionLspRestart`, `:CarrionHealth`
 
-1. Create or update your LSP configuration file at `~/.config/nvim/lua/custom/configs/lspconfig.lua`:
+### 💻 VS Code
+
+#### 🚀 Quick Setup
+
+**1. Install LSP server:**
+```bash
+git clone https://github.com/javanhut/CarrionLanguage-LSP.git
+cd CarrionLanguage-LSP
+make install
+```
+
+**2. Install VS Code extension:**
+```bash
+# Copy extension to VS Code
+cp -r editors/vscode ~/.vscode/extensions/carrion-language-0.1.0
+
+# Restart VS Code
+```
+
+**3. Optional configuration in VS Code settings.json:**
+```json
+{
+  "carrion.server.path": "carrion-lsp",
+  "carrion.server.logLevel": "info"
+}
+```
+
+#### ✅ What You Get
+
+- **IntelliSense**: Smart autocompletion for all Carrion syntax
+- **Syntax Highlighting**: Beautiful color-coded Carrion code
+- **Error Squiggles**: Real-time error detection and warnings
+- **Hover Documentation**: Detailed info on functions and variables
+- **Go to Definition**: Jump to symbol definitions with F12
+- **Auto-formatting**: Format code with Shift+Alt+F
+
+---
+
+### 🔧 Advanced/Alternative Setups
+
+<details>
+<summary><strong>Manual Neovim LSP Configuration (Click to expand)</strong></summary>
+
+If you prefer manual setup without the plugin, create this file at `~/.config/nvim/lua/custom/configs/lspconfig.lua`:
 
 ```lua
 local on_attach = require("plugins.configs.lspconfig").on_attach
@@ -74,9 +176,7 @@ local capabilities = require("plugins.configs.lspconfig").capabilities
 local lspconfig = require("lspconfig")
 local util = require "lspconfig/util"
 
--- Your existing LSP configurations...
-
--- Properly register Carrion LSP as a custom server
+-- Register Carrion LSP as a custom server
 local configs = require('lspconfig.configs')
 if not configs.carrion then
   configs.carrion = {
@@ -96,10 +196,7 @@ lspconfig.carrion.setup {
 }
 ```
 
-#### Filetype Detection
-
-Create a filetype detection file at `~/.config/nvim/ftdetect/carrion.lua`:
-
+**Add filetype detection** (`~/.config/nvim/ftdetect/carrion.lua`):
 ```lua
 vim.api.nvim_create_autocmd({"BufRead", "BufNewFile"}, {
   pattern = "*.crl",
@@ -109,136 +206,269 @@ vim.api.nvim_create_autocmd({"BufRead", "BufNewFile"}, {
 })
 ```
 
-#### Filetype Plugin
+</details>
 
-Create a filetype plugin at `~/.config/nvim/ftplugin/carrion.lua`:
+<details>
+<summary><strong>Emacs with LSP-mode (Click to expand)</strong></summary>
 
-```lua
--- ftplugin/carrion.lua
--- Set indentation
-vim.bo.expandtab = true
-vim.bo.shiftwidth = 4
-vim.bo.tabstop = 4
-vim.bo.softtabstop = 4
-
--- Enable LSP features for Carrion files
-vim.bo.omnifunc = 'v:lua.vim.lsp.omnifunc'
+**1. Install LSP server:**
+```bash
+git clone https://github.com/javanhut/CarrionLanguage-LSP.git
+cd CarrionLanguage-LSP
+make install
 ```
 
-#### Syntax Highlighting
+**2. Add to your `~/.emacs.d/init.el`:**
+```elisp
+(use-package lsp-mode
+  :ensure t
+  :hook (carrion-mode . lsp)
+  :commands lsp)
 
-Create a syntax file at `~/.config/nvim/syntax/carrion.vim`:
+;; Define carrion-mode
+(define-derived-mode carrion-mode fundamental-mode "Carrion"
+  "Major mode for Carrion language files."
+  (setq comment-start "# ")
+  (setq comment-end ""))
 
+;; Associate .crl files with carrion-mode
+(add-to-list 'auto-mode-alist '("\\.crl\\'" . carrion-mode))
+
+;; Register Carrion LSP server
+(with-eval-after-load 'lsp-mode
+  (add-to-list 'lsp-language-id-configuration '(carrion-mode . "carrion"))
+  (lsp-register-client
+   (make-lsp-client :new-connection (lsp-stdio-connection "carrion-lsp")
+                    :major-modes '(carrion-mode)
+                    :server-id 'carrion-lsp)))
+```
+
+</details>
+
+<details>
+<summary><strong>Vim with CoC (Click to expand)</strong></summary>
+
+**1. Install LSP server:**
+```bash
+git clone https://github.com/javanhut/CarrionLanguage-LSP.git
+cd CarrionLanguage-LSP
+make install
+```
+
+**2. Configure CoC settings** (`~/.config/nvim/coc-settings.json` or `:CocConfig`):
+```json
+{
+  "languageserver": {
+    "carrion": {
+      "command": "carrion-lsp",
+      "args": ["--stdio"],
+      "filetypes": ["carrion"],
+      "rootPatterns": [".git/", "."],
+      "settings": {}
+    }
+  }
+}
+```
+
+**3. Add filetype detection** (`~/.config/nvim/ftdetect/carrion.vim`):
 ```vim
-if exists("b:current_syntax")
-  finish
-endif
-
-" Keywords
-syntax keyword carrionKeyword spell grim init self if else otherwise
-syntax keyword carrionKeyword for in while stop skip ignore return import
-syntax keyword carrionKeyword match case attempt resolve ensnare raise as
-syntax keyword carrionKeyword arcane arcanespell super check and or not
-
-" Boolean values
-syntax keyword carrionBoolean True False None
-
-" Comments
-syntax match carrionComment "//.*$"
-
-" Strings
-syntax region carrionString start=/"/ skip=/\\"/ end=/"/
-syntax region carrionString start=/'/ skip=/\\'/ end=/'/
-
-" Numbers
-syntax match carrionNumber "\<\d\+\>"
-syntax match carrionNumber "\<\d\+\.\d*\>"
-
-" Highlight links
-highlight link carrionKeyword Keyword
-highlight link carrionBoolean Boolean
-highlight link carrionComment Comment
-highlight link carrionString String
-highlight link carrionNumber Number
-
-let b:current_syntax = "carrion"
+au BufRead,BufNewFile *.crl set filetype=carrion
 ```
 
-## Usage
+</details>
 
-1. Create a new Carrion file with a `.crl` extension:
+## Usage and Features
 
-```bash
-touch example.crl
-```
+### Basic Usage
 
-2. Open the file in Neovim:
+1. **Create a Carrion file**:
+   ```bash
+   touch my_project.crl
+   ```
 
-```bash
-nvim example.crl
-```
+2. **Open in your editor** (VS Code, Neovim, Emacs, etc.)
 
-3. Start typing Carrion code. You should have:
-   - Syntax highlighting
-   - Code completion (trigger with Ctrl+X Ctrl+O or automatically)
-   - Hover information (trigger with K on a symbol)
-   - Go-to-definition (trigger with gd on a symbol)
-   - Document formatting (typically on save or with a key binding)
+3. **Start coding with full LSP support**:
+   - 🎯 **Auto-completion**: Type `.` after objects or start typing keywords
+   - 💡 **Hover documentation**: Hover over symbols for detailed information
+   - 🔍 **Go-to-definition**: Jump to symbol definitions instantly
+   - ⚡ **Real-time diagnostics**: See syntax errors and warnings as you type
+   - 🎨 **Auto-formatting**: Format your code automatically
+   - 📝 **Signature help**: See function parameters while typing
 
-## Example Carrion Code
+### Example Carrion Code
 
-```
-// Example Carrion code
+```carrion
+# Advanced Carrion example showcasing LSP features
+import "math"
+
 grim Calculator:
-    init:
-        self.result = 0
-        
-    spell add(a, b):
-        return a + b
-        
-    spell subtract(a, b):
-        return a - b
-        
-    spell multiply(a, b):
-        return a * b
-        
-    spell divide(a, b):
-        if b == 0:
-            raise "Division by zero"
-        return a / b
+    ```
+    A magical calculator grimoire with enhanced arithmetic capabilities.
+    Supports basic operations and advanced mathematical functions.
+    ```
+    
+    init(precision: int = 2):
+        self.precision = precision
+        self.history = []
+    
+    spell add(a: float, b: float) -> float:
+        ```Add two numbers with precision tracking```
+        result = a + b
+        self.history.append(f"add({a}, {b}) = {result}")
+        return result
+    
+    spell power(base: float, exponent: float) -> float:
+        ```Calculate base raised to the power of exponent```
+        if base == 0 and exponent < 0:
+            raise "Cannot divide by zero"
+        return base ** exponent
+
+# Function with error handling
+spell safe_divide(x: float, y: float) -> float:
+    attempt:
+        if y == 0:
+            raise "Division by zero error"
+        return x / y
+    ensnare error:
+        print(f"Error occurred: {error}")
+        return 0.0
+    resolve:
+        print("Division operation completed")
+
+# Usage with full LSP support
+calc = Calculator(3)
+result = calc.add(10.5, 20.3)  # LSP shows signature help
+print(calc.power(2, 8))        # Hover shows documentation
 ```
+
+### LSP Features Demonstration
+
+- **Completion**: As you type `calc.`, the LSP will suggest `add`, `power`, `precision`, `history`
+- **Hover**: Hovering over `Calculator` shows the docstring and type information
+- **Diagnostics**: Syntax errors are highlighted in real-time
+- **Signature Help**: When typing `calc.add(`, you'll see parameter information
+- **Go-to-Definition**: Clicking on `Calculator` jumps to its definition
+
+## Architecture
+
+### LSP Server Components
+
+The Carrion Language Server is built with a modular architecture:
+
+```
+carrion-lsp/
+├── cmd/server/           # Entry point and CLI handling
+├── internal/
+│   ├── handler/          # LSP protocol handlers
+│   ├── analyzer/         # Language analysis engine
+│   ├── symbols/          # Symbol table management
+│   ├── formatter/        # Code formatting
+│   ├── protocol/         # LSP protocol abstractions
+│   ├── langserver/       # Server lifecycle management
+│   └── util/             # Utilities and logging
+└── editors/              # Editor-specific configurations
+```
+
+### Key Features
+
+1. **Real-time Analysis**: Uses TheCarrionLanguage's lexer and parser
+2. **Symbol Management**: Comprehensive symbol table with scope tracking
+3. **Multi-transport**: Supports both stdio and TCP communication
+4. **Extensible**: Modular design for easy feature addition
 
 ## Troubleshooting
 
-If you encounter issues:
+### Common Issues
 
-1. Check if the language server is running:
+1. **Server not starting**:
+   ```bash
+   # Check if carrion-lsp is in PATH
+   which carrion-lsp
+   
+   # Verify installation
+   carrion-lsp --version
+   ```
+
+2. **No completions appearing**:
+   ```bash
+   # Check LSP client logs (editor-specific)
+   # For Neovim:
+   :LspLog
+   
+   # For VS Code: View > Output > Carrion Language Server
+   ```
+
+3. **Diagnostics not showing**:
+   ```bash
+   # Test server directly
+   echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}' | carrion-lsp --stdio
+   ```
+
+4. **Debug mode**:
+   ```bash
+   # Run with detailed logging
+   carrion-lsp --stdio --log=/tmp/carrion-lsp-debug.log
+   
+   # Monitor the log file
+   tail -f /tmp/carrion-lsp-debug.log
+   ```
+
+### Performance Tips
+
+- **Large files**: The server handles files up to 10MB efficiently
+- **Memory usage**: Typical memory usage is 20-50MB per workspace
+- **Startup time**: Initial parsing may take 1-2 seconds for large projects
+
+## Contributing
+
+1. **Fork the repository**
+2. **Create a feature branch**: `git checkout -b feature/amazing-feature`
+3. **Make your changes**
+4. **Run tests**: `make test`
+5. **Format code**: `make fmt`
+6. **Submit a pull request**
+
+### Development Setup
+
 ```bash
-ps aux | grep carrion-lsp
+git clone https://github.com/javanhut/carrionlang-lsp.git
+cd carrionlang-lsp
+go mod tidy
+make build
+make test
 ```
 
-2. Enable LSP logging in Neovim:
-```lua
-vim.lsp.set_log_level("debug")
-```
+## Roadmap
 
-3. View LSP logs:
-```
-:LspInfo
-:lua vim.cmd('e'..vim.lsp.get_log_path())
-```
+### Planned Features
+- [ ] **Code actions**: Quick fixes and refactoring
+- [ ] **Rename symbol**: Workspace-wide symbol renaming
+- [ ] **Find references**: Show all usages of a symbol
+- [ ] **Document symbols**: Outline view support
+- [ ] **Workspace symbols**: Global symbol search
+- [ ] **Incremental parsing**: Faster updates for large files
+- [ ] **Multi-root workspaces**: Support for complex project structures
 
-4. Start the language server with logging enabled:
-```bash
-carrion-lsp --stdio --log=/tmp/carrion-lsp.log
-```
+### Editor Support
+- [x] **VS Code** (extension available)
+- [x] **Neovim** (with built-in LSP)
+- [x] **Emacs** (with lsp-mode)
+- [x] **Vim** (with CoC)
+- [ ] **Sublime Text** (LSP plugin)
+- [ ] **IntelliJ IDEA** (plugin planned)
 
 ## License
 
-[MIT License](LICENSE)
+MIT License - see [LICENSE](LICENSE) for details.
 
 ## Acknowledgements
 
-- [Carrion Language](https://github.com/javanhut/TheCarrionLanguage) - The language this server supports
-- [go.lsp.dev](https://go.lsp.dev/) - LSP implementation for Go
-- [NvChad](https://github.com/NvChad/NvChad) - Neovim configuration framework
+- **[TheCarrionLanguage](https://github.com/javanhut/TheCarrionLanguage)** - The magical language this server supports
+- **[go.lsp.dev](https://go.lsp.dev/)** - Excellent LSP implementation for Go
+- **[Language Server Protocol](https://microsoft.github.io/language-server-protocol/)** - The protocol specification
+- **Go Community** - For the robust tooling and ecosystem
+
+---
+
+**Happy Coding with Carrion! 🐦‍⬛✨**

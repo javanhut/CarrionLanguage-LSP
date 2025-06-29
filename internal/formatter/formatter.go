@@ -92,6 +92,9 @@ type formatterContext struct {
 
 // formatDocument formats a Carrion document
 func (f *CarrionFormatter) formatDocument(text string) string {
+	// First, handle multi-line comments
+	text = f.normalizeBlockComments(text)
+	
 	// Create a formatter context
 	ctx := &formatterContext{
 		indentLevel:   0,
@@ -117,6 +120,65 @@ func (f *CarrionFormatter) formatDocument(text string) string {
 	}
 
 	return ctx.output.String()
+}
+
+// normalizeBlockComments handles multi-line comment formatting
+func (f *CarrionFormatter) normalizeBlockComments(text string) string {
+	// Handle /* */ block comments
+	text = f.normalizeSlashStarComments(text)
+	
+	// Handle ``` triple backtick comments
+	text = f.normalizeTripleBacktickComments(text)
+	
+	return text
+}
+
+// normalizeSlashStarComments formats /* */ style block comments
+func (f *CarrionFormatter) normalizeSlashStarComments(text string) string {
+	var result strings.Builder
+	inComment := false
+	i := 0
+	
+	for i < len(text) {
+		if !inComment && i < len(text)-1 && text[i] == '/' && text[i+1] == '*' {
+			inComment = true
+			result.WriteString("/*")
+			i += 2
+		} else if inComment && i < len(text)-1 && text[i] == '*' && text[i+1] == '/' {
+			inComment = false
+			result.WriteString("*/")
+			i += 2
+		} else {
+			result.WriteByte(text[i])
+			i++
+		}
+	}
+	
+	return result.String()
+}
+
+// normalizeTripleBacktickComments formats ``` style block comments
+func (f *CarrionFormatter) normalizeTripleBacktickComments(text string) string {
+	var result strings.Builder
+	inComment := false
+	i := 0
+	
+	for i < len(text) {
+		if !inComment && i < len(text)-2 && text[i] == '`' && text[i+1] == '`' && text[i+2] == '`' {
+			inComment = true
+			result.WriteString("```")
+			i += 3
+		} else if inComment && i < len(text)-2 && text[i] == '`' && text[i+1] == '`' && text[i+2] == '`' {
+			inComment = false
+			result.WriteString("```")
+			i += 3
+		} else {
+			result.WriteByte(text[i])
+			i++
+		}
+	}
+	
+	return result.String()
 }
 
 // formatLine formats a single line of code
@@ -491,7 +553,7 @@ func formatCommas(line string) string {
 
 // formatComments normalizes comments
 func formatComments(line string) string {
-	// Find comment start (//), ensuring it's not inside a string
+	// Find comment start (#), ensuring it's not inside a string
 	inString := false
 	inSingleQuoteString := false
 	commentStart := -1
@@ -501,7 +563,7 @@ func formatComments(line string) string {
 			inString = !inString
 		} else if line[i] == '\'' && (i == 0 || line[i-1] != '\\') {
 			inSingleQuoteString = !inSingleQuoteString
-		} else if !inString && !inSingleQuoteString && i < len(line)-1 && line[i] == '/' && line[i+1] == '/' {
+		} else if !inString && !inSingleQuoteString && line[i] == '#' {
 			commentStart = i
 			break
 		}
@@ -511,13 +573,13 @@ func formatComments(line string) string {
 		return line // No comment in this line
 	}
 
-	// Ensure there's a space after the // if it's not a line-only comment
+	// Ensure there's a space after the # if it's not a line-only comment
 	if commentStart > 0 {
 		code := strings.TrimSpace(line[:commentStart])
 		comment := line[commentStart:]
 
-		if len(comment) > 2 && comment[2] != ' ' {
-			comment = "// " + comment[2:]
+		if len(comment) > 1 && comment[1] != ' ' {
+			comment = "# " + comment[1:]
 		}
 
 		// Ensure exactly one space between code and comment
@@ -526,8 +588,8 @@ func formatComments(line string) string {
 
 	// Line-only comment
 	comment := line[commentStart:]
-	if len(comment) > 2 && comment[2] != ' ' {
-		comment = "// " + comment[2:]
+	if len(comment) > 1 && comment[1] != ' ' {
+		comment = "# " + comment[1:]
 	}
 
 	return comment

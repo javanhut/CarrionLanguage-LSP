@@ -156,9 +156,12 @@ func (st *SymbolTable) processGrimoireDefinition(node *ast.GrimoireDefinition, s
 }
 
 func extractPositionFromToken(tok token.Token) struct{ Line, Column int } {
-	// This is a placeholder implementation
-	// In a real implementation, extract the line and column from the token
-	return struct{ Line, Column int }{Line: 0, Column: 0}
+	// Extract line and column from the token
+	// Tokens in Carrion have Line and Column fields
+	return struct{ Line, Column int }{
+		Line:   tok.Line - 1,   // Convert to 0-based for LSP
+		Column: tok.Column - 1, // Convert to 0-based for LSP
+	}
 }
 
 // processMethod processes a method definition within a Grimoire
@@ -177,21 +180,24 @@ func (st *SymbolTable) processMethod(
 
 	params := make([]Parameter, 0, len(node.Parameters))
 	for _, p := range node.Parameters {
-		param := Parameter{
-			Name: p.Name.Value,
-		}
-
-		if p.TypeHint != nil {
-			if typeIdent, ok := p.TypeHint.(*ast.Identifier); ok {
-				param.TypeHint = typeIdent.Value
+		// Type assert the Expression to *Parameter
+		if paramNode, ok := p.(*ast.Parameter); ok {
+			param := Parameter{
+				Name: paramNode.Name.Value,
 			}
-		}
 
-		if p.DefaultValue != nil {
-			param.DefaultValue = p.DefaultValue.String()
-		}
+			if paramNode.TypeHint != nil {
+				if typeIdent, ok := paramNode.TypeHint.(*ast.Identifier); ok {
+					param.TypeHint = typeIdent.Value
+				}
+			}
 
-		params = append(params, param)
+			if paramNode.DefaultValue != nil {
+				param.DefaultValue = paramNode.DefaultValue.String()
+			}
+
+			params = append(params, param)
+		}
 	}
 
 	methodSymbol := &Symbol{
@@ -258,21 +264,24 @@ func (st *SymbolTable) processFunctionDefinition(node *ast.FunctionDefinition, s
 
 	params := make([]Parameter, 0, len(node.Parameters))
 	for _, p := range node.Parameters {
-		param := Parameter{
-			Name: p.Name.Value,
-		}
-
-		if p.TypeHint != nil {
-			if typeIdent, ok := p.TypeHint.(*ast.Identifier); ok {
-				param.TypeHint = typeIdent.Value
+		// Type assert the Expression to *Parameter
+		if paramNode, ok := p.(*ast.Parameter); ok {
+			param := Parameter{
+				Name: paramNode.Name.Value,
 			}
-		}
 
-		if p.DefaultValue != nil {
-			param.DefaultValue = p.DefaultValue.String()
-		}
+			if paramNode.TypeHint != nil {
+				if typeIdent, ok := paramNode.TypeHint.(*ast.Identifier); ok {
+					param.TypeHint = typeIdent.Value
+				}
+			}
 
-		params = append(params, param)
+			if paramNode.DefaultValue != nil {
+				param.DefaultValue = paramNode.DefaultValue.String()
+			}
+
+			params = append(params, param)
+		}
 	}
 
 	funcScope := &Scope{

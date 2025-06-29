@@ -80,6 +80,8 @@ func (h *Handler) Handle(
 		return h.handleTextDocumentDefinition(ctx, req)
 	case "textDocument/hover":
 		return h.handleTextDocumentHover(ctx, req)
+	case "textDocument/signatureHelp":
+		return h.handleTextDocumentSignatureHelp(ctx, req)
 	default:
 		h.logger.Warn("Unsupported method: %s", req.Method())
 		return nil, &jsonrpc2.Error{
@@ -117,6 +119,9 @@ func (h *Handler) handleInitialize(
 		HoverProvider:              true,
 		DefinitionProvider:         true,
 		DocumentFormattingProvider: true,
+		SignatureHelpProvider: &lsp.SignatureHelpOptions{
+			TriggerCharacters: []string{"(", ","},
+		},
 	}
 
 	h.initialized = true
@@ -286,6 +291,21 @@ func (h *Handler) handleTextDocumentHover(
 
 	hoverInfo := h.analyzer.GetHoverInfo(params.TextDocument.URI, params.Position)
 	return hoverInfo, nil
+}
+
+func (h *Handler) handleTextDocumentSignatureHelp(
+	ctx context.Context,
+	req jsonrpc2.Request,
+) (interface{}, error) {
+	var params lsp.SignatureHelpParams
+	if err := json.Unmarshal(req.Params(), &params); err != nil {
+		return nil, err
+	}
+
+	h.logger.Debug("Signature help requested at position %v in %s", params.Position, params.TextDocument.URI)
+
+	signatureHelp := h.analyzer.GetSignatureHelp(params.TextDocument.URI, params.Position)
+	return signatureHelp, nil
 }
 
 func (h *Handler) sendDiagnostics(

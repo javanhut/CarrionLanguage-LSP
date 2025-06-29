@@ -1,0 +1,84 @@
+{
+  "name": "carrion-language",
+  "displayName": "Carrion Language Support",
+  "description": "Language support for Carrion programming language",
+  "version": "0.1.0",
+  "publisher": "carrion-lang",
+  "engines": {
+    "vscode": "^1.74.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "activationEvents": [
+    "onLanguage:carrion"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "carrion",
+        "aliases": [
+          "Carrion",
+          "carrion"
+        ],
+        "extensions": [
+          ".crl"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "carrion",
+        "scopeName": "source.carrion",
+        "path": "./syntaxes/carrion.tmLanguage.json"
+      }
+    ],
+    "configuration": {
+      "type": "object",
+      "title": "Carrion Language Server",
+      "properties": {
+        "carrion.server.path": {
+          "type": "string",
+          "default": "carrion-lsp",
+          "description": "Path to the Carrion language server executable"
+        },
+        "carrion.server.logLevel": {
+          "type": "string",
+          "default": "info",
+          "enum": [
+            "debug",
+            "info",
+            "warn",
+            "error"
+          ],
+          "description": "Language server log level"
+        },
+        "carrion.server.trace": {
+          "type": "string",
+          "default": "off",
+          "enum": [
+            "off",
+            "messages",
+            "verbose"
+          ],
+          "description": "Trace communication between VS Code and the language server"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^8.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^18.0.0",
+    "@types/vscode": "^1.74.0",
+    "typescript": "^5.0.0"
+  }
+}

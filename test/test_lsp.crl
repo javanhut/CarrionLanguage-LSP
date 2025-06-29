@@ -1,0 +1,105 @@
+# Test file for Carrion LSP functionality
+
+import "math"
+
+# Define a magical creature grimoire
+grim MagicalCreature:
+    ```
+    Base class for all magical creatures in the realm.
+    Provides basic properties and spells for creature management.
+    ```
+    
+    init(name, power_level = 100):
+        self.name = name
+        self.power = power_level
+        self.health = 100
+        self.spells_cast = []
+    
+    spell cast_spell(target, spell_name = "fireball"):
+        ```Cast a spell on the target```
+        if self.power < 10:
+            raise "Not enough power to cast spell"
+        
+        self.power -= 10
+        self.spells_cast.append(spell_name)
+        return f"{self.name} casts {spell_name} on {target}!"
+    
+    spell heal(amount):
+        ```Heal the creature by the specified amount```
+        self.health += amount
+        if self.health > 100:
+            self.health = 100
+        return self.health
+    
+    spell get_status():
+        return f"{self.name}: Health={self.health}, Power={self.power}"
+
+# Derived grimoire for dragons
+grim Dragon(MagicalCreature):
+    init(name, breath_type = "fire"):
+        super.init(name, 200)  # Dragons have more power
+        self.breath_type = breath_type
+        self.treasures = []
+    
+    spell breathe_attack(target):
+        ```Unleash a devastating breath attack```
+        if self.power < 30:
+            return "Not enough power for breath attack"
+        
+        self.power -= 30
+        return f"{self.name} breathes {self.breath_type} at {target}!"
+    
+    spell hoard_treasure(item):
+        self.treasures.append(item)
+        return f"{self.name} adds {item} to their hoard"
+
+# Test function with various features
+spell test_creatures():
+    # Create creatures
+    phoenix = MagicalCreature("Phoenix", 150)
+    dragon = Dragon("Smaug", "fire")
+    
+    # Test spell casting
+    print(phoenix.cast_spell("enemy"))
+    print(dragon.breathe_attack("castle"))
+    
+    # Test conditional logic
+    if dragon.power > 100:
+        print("Dragon is still powerful!")
+    otherwise dragon.power > 50:
+        print("Dragon power is moderate")
+    else:
+        print("Dragon needs rest")
+    
+    # Test loops
+    treasures = ["gold", "gems", "artifacts"]
+    for treasure in treasures:
+        print(dragon.hoard_treasure(treasure))
+    
+    # Test error handling
+    attempt:
+        weak_creature = MagicalCreature("Imp", 5)
+        weak_creature.cast_spell("hero")  // This should fail
+    ensnare error:
+        print(f"Spell failed: {error}")
+    resolve:
+        print("Spell casting attempt completed")
+    
+    # Test match statement
+    spell_type = "fire"
+    match spell_type:
+        case "fire":
+            print("Fire spell selected")
+        case "ice":
+            print("Ice spell selected")
+        case "lightning":
+            print("Lightning spell selected")
+        case _:
+            print("Unknown spell type")
+    
+    return "Test completed successfully"
+
+// Main execution
+if __name__ == "__main__":
+    result = test_creatures()
+    print(result)
