@@ -273,7 +273,7 @@ func (f *CarrionFormatter) formatLine(
 
 	// Handle spacing between different sections
 	trimmedNextLine := strings.TrimSpace(nextLine)
-	if isSpell && ctx.inGrimoire && isSpell && trimmedNextLine != "" &&
+	if isSpell && ctx.inGrimoire && trimmedNextLine != "" &&
 		!strings.HasPrefix(trimmedNextLine, "spell ") {
 		// Add a blank line after spell definition if the next line isn't empty or another spell
 		ctx.output.WriteString("\n")
@@ -385,7 +385,7 @@ func isBlockEnd(line string) bool {
 // formatOperators ensures proper spacing around operators
 func formatOperators(line string) string {
 	operators := []string{
-		"+", "-", "*", "/", "=", "==", "!=", "<", ">", "<=", ">=",
+		"+", "-", "*", "=", "==", "!=", "<", ">", "<=", ">=",
 		"and", "or", "not", "%", "**", "+=", "-=", "*=", "/=",
 	}
 
@@ -400,9 +400,10 @@ func formatOperators(line string) string {
 			continue
 		}
 
-		// Don't add spaces around operators in strings
+		// Don't add spaces around operators in strings or comments
 		inString := false
 		inSingleQuoteString := false
+		inComment := false
 		var processedLine strings.Builder
 
 		for i := 0; i < len(result); i++ {
@@ -412,7 +413,36 @@ func formatOperators(line string) string {
 			} else if result[i] == '\'' && (i == 0 || result[i-1] != '\\') {
 				inSingleQuoteString = !inSingleQuoteString
 				processedLine.WriteByte(result[i])
-			} else if !inString && !inSingleQuoteString && i <= len(result)-len(op) && result[i:i+len(op)] == op {
+			} else if result[i] == '#' && !inString && !inSingleQuoteString {
+				inComment = true
+				processedLine.WriteByte(result[i])
+			} else if i < len(result)-1 && result[i:i+2] == "//" && !inString && !inSingleQuoteString {
+				// Handle double slash comments - don't format as operators
+				processedLine.WriteString("//")
+				i++ // Skip the next character
+			} else if !inString && !inSingleQuoteString && !inComment && i <= len(result)-len(op) && result[i:i+len(op)] == op {
+				// Only format standalone operators, not parts of words
+				prevChar := byte(0)
+				nextChar := byte(0)
+				if i > 0 {
+					prevChar = result[i-1]
+				}
+				if i+len(op) < len(result) {
+					nextChar = result[i+len(op)]
+				}
+
+				// For "or" and "and", ensure they're standalone words
+				if op == "or" || op == "and" {
+					isPrevWordChar := isIdentifierChar(prevChar)
+					isNextWordChar := isIdentifierChar(nextChar)
+					
+					if isPrevWordChar || isNextWordChar {
+						// This is part of a word, don't format as operator
+						processedLine.WriteByte(result[i])
+						continue
+					}
+				}
+
 				// Add spaces around the operator, but only if not in a string
 				if i > 0 && result[i-1] != ' ' {
 					processedLine.WriteByte(' ')
@@ -430,7 +460,63 @@ func formatOperators(line string) string {
 		result = processedLine.String()
 	}
 
+	// Handle division operator separately to avoid breaking // comments
+	result = formatDivisionOperator(result)
+
 	return result
+}
+
+// formatDivisionOperator handles division operator formatting while preserving // comments
+func formatDivisionOperator(line string) string {
+	inString := false
+	inSingleQuoteString := false
+	inComment := false
+	var result strings.Builder
+
+	for i := 0; i < len(line); i++ {
+		if line[i] == '"' && (i == 0 || line[i-1] != '\\') {
+			inString = !inString
+			result.WriteByte(line[i])
+		} else if line[i] == '\'' && (i == 0 || line[i-1] != '\\') {
+			inSingleQuoteString = !inSingleQuoteString
+			result.WriteByte(line[i])
+		} else if line[i] == '#' && !inString && !inSingleQuoteString {
+			inComment = true
+			result.WriteByte(line[i])
+		} else if i < len(line)-1 && line[i:i+2] == "//" && !inString && !inSingleQuoteString {
+			// Preserve // comments
+			result.WriteString("//")
+			i++ // Skip the next character
+		} else if !inString && !inSingleQuoteString && !inComment && line[i] == '/' {
+			// Check if this is a standalone division operator
+			prevChar := byte(0)
+			nextChar := byte(0)
+			if i > 0 {
+				prevChar = line[i-1]
+			}
+			if i+1 < len(line) {
+				nextChar = line[i+1]
+			}
+
+			// Make sure it's not part of // comment or /= operator
+			if nextChar != '/' && nextChar != '=' {
+				// Add spaces around division operator
+				if i > 0 && prevChar != ' ' {
+					result.WriteByte(' ')
+				}
+				result.WriteByte('/')
+				if i+1 < len(line) && nextChar != ' ' {
+					result.WriteByte(' ')
+				}
+			} else {
+				result.WriteByte(line[i])
+			}
+		} else {
+			result.WriteByte(line[i])
+		}
+	}
+
+	return result.String()
 }
 
 // formatColons ensures proper spacing around colons
