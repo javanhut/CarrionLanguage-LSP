@@ -1,0 +1,74 @@
+```
+Test file to demonstrate grimoire method completions in the LSP
+This file tests various scenarios for dot completion
+```
+
+// Test 1: Built-in grimoire method completion
+time = Time()
+// Type 'time.' to see: now(), now_nano(), sleep(), format(), parse(), date(), add_duration(), diff()
+
+// Test 2: Direct grimoire class method completion  
+// Type 'Time.' to see the same methods
+
+// Test 3: String methods on string variables
+my_string = "hello world"
+// Type 'my_string.' to see: length(), upper(), lower(), reverse(), find(), contains(), char_at()
+
+// Test 4: String methods on string literals
+// Type '"hello".' to see string methods
+
+// Test 5: Custom grimoire with methods
+grim MyCustomGrimoire:
+    init(self, name):
+        self.name = name
+        self.count = 0
+    
+    spell increment(self):
+        ```Increments the counter```
+        self.count = self.count + 1
+    
+    spell get_info(self):
+        ```Returns information about this grimoire instance```
+        return f"Name: {self.name}, Count: {self.count}"
+    
+    spell reset(self, new_name = "default"):
+        ```Resets the counter and optionally changes name```
+        self.count = 0
+        if new_name != "default":
+            self.name = new_name
+
+// Test 6: Custom grimoire instance method completion
+my_custom = MyCustomGrimoire("test")
+// Type 'my_custom.' to see: increment(), get_info(), reset(), name, count
+
+// Test 7: Math grimoire methods
+// Type 'Math.' to see: abs(), sqrt(), pow(), sin(), cos(), tan(), log(), ceil(), floor(), round(), min(), max()
+
+// Test 8: File grimoire methods  
+// Type 'File.' to see: read(), write(), append(), exists(), delete(), copy(), size()
+
+// Test 9: OS grimoire methods
+// Type 'OS.' to see: run(), getenv(), setenv(), getcwd(), chdir(), listdir(), mkdir(), rmdir(), expandenv()
+
+// Test 10: Array methods (when implemented)
+my_array = [1, 2, 3]
+// Type 'my_array.' to see: length(), append(), prepend(), pop(), shift(), contains(), index(), reverse(), sort()
+
+// Test 11: String indexing with new syntax
+str_test = "example"
+char = str_test[0]  // Should show 'e'
+last_char = str_test[-1]  // Should show 'e' (last character)
+
+// Test 12: New builtin functions
+ascii_code = ord("A")  // Should return 65
+character = chr(65)    // Should return "A"
+
+// Test 13: Time module functions as builtins
+current_time = timeNow()
+nano_time = timeNowNano()
+timeSleep(1)
+formatted = timeFormat(current_time, "2006-01-02 15:04:05")
+parsed = timeParse("2006-01-02", "2023-12-25")
+date_parts = timeDate(current_time)
+later_time = timeAddDuration(current_time, 3600)
+diff = timeDiff(later_time, current_time)

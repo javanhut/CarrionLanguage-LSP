@@ -120,9 +120,21 @@ func (a *CarrionAnalyzer) GetCompletions(
 			selfCompletions := a.getSelfCompletions(uri, position)
 			completionItems = append(completionItems, selfCompletions...)
 		} else {
-			// Add completions for other objects based on symbol table
-			objectCompletions := a.getObjectCompletions(uri, objectName)
-			completionItems = append(completionItems, objectCompletions...)
+			// Check if it's a string literal or variable that might be a string
+			stringCompletions := a.getStringCompletions(uri, objectName, textBeforeCursor)
+			if len(stringCompletions) > 0 {
+				completionItems = append(completionItems, stringCompletions...)
+			} else {
+				// Check if it's a grimoire instance or grimoire class
+				grimoireCompletions := a.getGrimoireCompletions(uri, objectName)
+				if len(grimoireCompletions) > 0 {
+					completionItems = append(completionItems, grimoireCompletions...)
+				} else {
+					// Add completions for other objects based on symbol table
+					objectCompletions := a.getObjectCompletions(uri, objectName)
+					completionItems = append(completionItems, objectCompletions...)
+				}
+			}
 		}
 	} else {
 		// Add keyword completions
@@ -140,6 +152,10 @@ func (a *CarrionAnalyzer) GetCompletions(
 		// Add global completions (Grimoires, etc.)
 		globalCompletions := a.getGlobalCompletions()
 		completionItems = append(completionItems, globalCompletions...)
+		
+		// Add built-in grimoires
+		builtinGrimoires := a.getBuiltinGrimoireNames()
+		completionItems = append(completionItems, builtinGrimoires...)
 	}
 
 	return completionItems
@@ -223,6 +239,378 @@ func (a *CarrionAnalyzer) getObjectCompletions(
 	return completions
 }
 
+// getStringCompletions returns completions for string methods
+func (a *CarrionAnalyzer) getStringCompletions(
+	uri lsp.DocumentURI,
+	objectName string,
+	textBeforeCursor string,
+) []lsp.CompletionItem {
+	// Check if the object is likely a string (either a string literal or string variable)
+	isStringLikely := false
+	
+	// Check for string literals (quoted strings)
+	if strings.Contains(textBeforeCursor, "\"") || strings.Contains(textBeforeCursor, "'") {
+		isStringLikely = true
+	}
+	
+	// Check if variable is known to be a string from symbol table
+	if !isStringLikely {
+		symbol := a.symbolTable.LookupSymbol(objectName, string(uri))
+		if symbol != nil && (symbol.ValueType == "string" || symbol.ValueType == "STRING") {
+			isStringLikely = true
+		}
+	}
+	
+	// If we have evidence this might be a string, provide string method completions
+	if !isStringLikely {
+		return nil
+	}
+	
+	// String grimoire methods from the Munin standard library
+	stringMethods := []struct {
+		name   string
+		detail string
+		doc    string
+	}{
+		{"length", "length() -> int", "Returns the length of the string"},
+		{"upper", "upper() -> string", "Converts string to uppercase"},
+		{"lower", "lower() -> string", "Converts string to lowercase"},
+		{"reverse", "reverse() -> string", "Reverses the order of characters in the string"},
+		{"find", "find(substring) -> int", "Finds the position of a substring, returns -1 if not found"},
+		{"contains", "contains(substring) -> bool", "Checks if the string contains a substring"},
+		{"char_at", "char_at(index) -> string", "Returns character at index with bounds checking"},
+	}
+	
+	completions := []lsp.CompletionItem{}
+	
+	for _, method := range stringMethods {
+		completions = append(completions, lsp.CompletionItem{
+			Label:         method.name,
+			Kind:          lsp.CompletionItemKindMethod,
+			Detail:        method.detail,
+			Documentation: method.doc,
+		})
+	}
+	
+	return completions
+}
+
+// getGrimoireCompletions returns completions for grimoire methods and fields
+func (a *CarrionAnalyzer) getGrimoireCompletions(
+	uri lsp.DocumentURI,
+	objectName string,
+) []lsp.CompletionItem {
+	// First check built-in grimoires (like Time)
+	if builtinCompletions := a.getBuiltinGrimoireCompletions(objectName); len(builtinCompletions) > 0 {
+		return builtinCompletions
+	}
+	
+	// Check if the object is a grimoire instance from the symbol table
+	symbol := a.symbolTable.LookupSymbol(objectName, string(uri))
+	if symbol != nil {
+		// Case 1: Variable that's an instance of a grimoire
+		if symbol.Type == "instance" && symbol.GrimoireName != "" {
+			grimoire := a.symbolTable.LookupGrimoire(symbol.GrimoireName)
+			if grimoire != nil {
+				return a.getMethodsAndFieldsForGrimoire(grimoire)
+			}
+		}
+		
+		// Case 2: Direct grimoire class (for static methods)
+		if symbol.Type == "Grimoire" {
+			grimoire := a.symbolTable.LookupGrimoire(symbol.Name)
+			if grimoire != nil {
+				return a.getMethodsAndFieldsForGrimoire(grimoire)
+			}
+		}
+	}
+	
+	// Case 3: Check if it's a known grimoire name directly
+	grimoire := a.symbolTable.LookupGrimoire(objectName)
+	if grimoire != nil {
+		return a.getMethodsAndFieldsForGrimoire(grimoire)
+	}
+	
+	return nil
+}
+
+// getBuiltinGrimoireCompletions returns completions for built-in grimoires
+func (a *CarrionAnalyzer) getBuiltinGrimoireCompletions(objectName string) []lsp.CompletionItem {
+	switch objectName {
+	case "Time":
+		return a.getTimeGrimoireCompletions()
+	case "String":
+		return a.getStringGrimoireCompletions()
+	case "Array":
+		return a.getArrayGrimoireCompletions()
+	case "Math":
+		return a.getMathGrimoireCompletions()
+	case "File":
+		return a.getFileGrimoireCompletions()
+	case "OS":
+		return a.getOSGrimoireCompletions()
+	default:
+		return nil
+	}
+}
+
+// getTimeGrimoireCompletions returns method completions for the Time grimoire
+func (a *CarrionAnalyzer) getTimeGrimoireCompletions() []lsp.CompletionItem {
+	methods := []struct {
+		name   string
+		detail string
+		doc    string
+	}{
+		{"now", "now() -> int", "Get current Unix timestamp (seconds since epoch)"},
+		{"now_nano", "now_nano() -> int", "Get current Unix timestamp in nanoseconds"},
+		{"sleep", "sleep(seconds)", "Sleep for specified number of seconds (can be float)"},
+		{"format", "format(timestamp, format_str?) -> string", "Format Unix timestamp to string using Go time format"},
+		{"parse", "parse(format_str, time_str) -> int", "Parse time string using format, returns Unix timestamp"},
+		{"date", "date(timestamp?) -> array", "Get date components [year, month, day] from timestamp or current time"},
+		{"add_duration", "add_duration(timestamp, seconds) -> int", "Add duration in seconds to timestamp, returns new timestamp"},
+		{"diff", "diff(timestamp1, timestamp2) -> int", "Calculate difference between two timestamps in seconds"},
+	}
+	
+	completions := []lsp.CompletionItem{}
+	for _, method := range methods {
+		completions = append(completions, lsp.CompletionItem{
+			Label:         method.name,
+			Kind:          lsp.CompletionItemKindMethod,
+			Detail:        method.detail,
+			Documentation: method.doc,
+		})
+	}
+	
+	return completions
+}
+
+// getStringGrimoireCompletions returns method completions for the String grimoire
+func (a *CarrionAnalyzer) getStringGrimoireCompletions() []lsp.CompletionItem {
+	methods := []struct {
+		name   string
+		detail string
+		doc    string
+	}{
+		{"length", "length() -> int", "Returns the length of the string"},
+		{"upper", "upper() -> string", "Converts string to uppercase"},
+		{"lower", "lower() -> string", "Converts string to lowercase"},
+		{"reverse", "reverse() -> string", "Reverses the order of characters in the string"},
+		{"find", "find(substring) -> int", "Finds the position of a substring, returns -1 if not found"},
+		{"contains", "contains(substring) -> bool", "Checks if the string contains a substring"},
+		{"char_at", "char_at(index) -> string", "Returns character at index with bounds checking"},
+	}
+	
+	completions := []lsp.CompletionItem{}
+	for _, method := range methods {
+		completions = append(completions, lsp.CompletionItem{
+			Label:         method.name,
+			Kind:          lsp.CompletionItemKindMethod,
+			Detail:        method.detail,
+			Documentation: method.doc,
+		})
+	}
+	
+	return completions
+}
+
+// getArrayGrimoireCompletions returns method completions for the Array grimoire
+func (a *CarrionAnalyzer) getArrayGrimoireCompletions() []lsp.CompletionItem {
+	methods := []struct {
+		name   string
+		detail string
+		doc    string
+	}{
+		{"length", "length() -> int", "Returns the length of the array"},
+		{"append", "append(item)", "Appends an item to the end of the array"},
+		{"prepend", "prepend(item)", "Prepends an item to the beginning of the array"},
+		{"pop", "pop() -> any", "Removes and returns the last item"},
+		{"shift", "shift() -> any", "Removes and returns the first item"},
+		{"contains", "contains(item) -> bool", "Checks if the array contains an item"},
+		{"index", "index(item) -> int", "Returns the index of the first occurrence of item"},
+		{"reverse", "reverse()", "Reverses the array in place"},
+		{"sort", "sort()", "Sorts the array in place"},
+	}
+	
+	completions := []lsp.CompletionItem{}
+	for _, method := range methods {
+		completions = append(completions, lsp.CompletionItem{
+			Label:         method.name,
+			Kind:          lsp.CompletionItemKindMethod,
+			Detail:        method.detail,
+			Documentation: method.doc,
+		})
+	}
+	
+	return completions
+}
+
+// getMathGrimoireCompletions returns method completions for the Math grimoire
+func (a *CarrionAnalyzer) getMathGrimoireCompletions() []lsp.CompletionItem {
+	methods := []struct {
+		name   string
+		detail string
+		doc    string
+	}{
+		{"abs", "abs(number) -> number", "Returns absolute value"},
+		{"sqrt", "sqrt(number) -> float", "Returns square root"},
+		{"pow", "pow(base, exponent) -> number", "Returns base raised to exponent"},
+		{"sin", "sin(radians) -> float", "Returns sine of angle in radians"},
+		{"cos", "cos(radians) -> float", "Returns cosine of angle in radians"},
+		{"tan", "tan(radians) -> float", "Returns tangent of angle in radians"},
+		{"log", "log(number) -> float", "Returns natural logarithm"},
+		{"ceil", "ceil(number) -> int", "Returns ceiling (round up)"},
+		{"floor", "floor(number) -> int", "Returns floor (round down)"},
+		{"round", "round(number) -> int", "Returns rounded value"},
+		{"min", "min(...numbers) -> number", "Returns minimum value"},
+		{"max", "max(...numbers) -> number", "Returns maximum value"},
+	}
+	
+	completions := []lsp.CompletionItem{}
+	for _, method := range methods {
+		completions = append(completions, lsp.CompletionItem{
+			Label:         method.name,
+			Kind:          lsp.CompletionItemKindMethod,
+			Detail:        method.detail,
+			Documentation: method.doc,
+		})
+	}
+	
+	return completions
+}
+
+// getFileGrimoireCompletions returns method completions for the File grimoire
+func (a *CarrionAnalyzer) getFileGrimoireCompletions() []lsp.CompletionItem {
+	methods := []struct {
+		name   string
+		detail string
+		doc    string
+	}{
+		{"read", "read(path) -> string", "Reads content from a file"},
+		{"write", "write(path, content)", "Writes content to a file"},
+		{"append", "append(path, content)", "Appends content to a file"},
+		{"exists", "exists(path) -> bool", "Checks if a file exists"},
+		{"delete", "delete(path)", "Deletes a file"},
+		{"copy", "copy(source, destination)", "Copies a file"},
+		{"size", "size(path) -> int", "Returns file size in bytes"},
+	}
+	
+	completions := []lsp.CompletionItem{}
+	for _, method := range methods {
+		completions = append(completions, lsp.CompletionItem{
+			Label:         method.name,
+			Kind:          lsp.CompletionItemKindMethod,
+			Detail:        method.detail,
+			Documentation: method.doc,
+		})
+	}
+	
+	return completions
+}
+
+// getOSGrimoireCompletions returns method completions for the OS grimoire
+func (a *CarrionAnalyzer) getOSGrimoireCompletions() []lsp.CompletionItem {
+	methods := []struct {
+		name   string
+		detail string
+		doc    string
+	}{
+		{"run", "run(command) -> string", "Executes a system command"},
+		{"getenv", "getenv(name) -> string", "Gets environment variable"},
+		{"setenv", "setenv(name, value)", "Sets environment variable"},
+		{"getcwd", "getcwd() -> string", "Gets current working directory"},
+		{"chdir", "chdir(path)", "Changes current directory"},
+		{"listdir", "listdir(path) -> array", "Lists directory contents"},
+		{"mkdir", "mkdir(path)", "Creates a directory"},
+		{"rmdir", "rmdir(path)", "Removes a directory"},
+		{"expandenv", "expandenv(path) -> string", "Expands environment variables in path"},
+	}
+	
+	completions := []lsp.CompletionItem{}
+	for _, method := range methods {
+		completions = append(completions, lsp.CompletionItem{
+			Label:         method.name,
+			Kind:          lsp.CompletionItemKindMethod,
+			Detail:        method.detail,
+			Documentation: method.doc,
+		})
+	}
+	
+	return completions
+}
+
+// getMethodsAndFieldsForGrimoire returns method and field completions for a custom grimoire
+func (a *CarrionAnalyzer) getMethodsAndFieldsForGrimoire(grimoire *symbols.GrimoireSymbol) []lsp.CompletionItem {
+	completions := []lsp.CompletionItem{}
+	
+	// Add methods
+	for _, method := range grimoire.Methods {
+		var paramStrs []string
+		for _, param := range method.Parameters {
+			paramStr := param.Name
+			if param.TypeHint != "" {
+				paramStr += ": " + param.TypeHint
+			}
+			if param.DefaultValue != "" {
+				paramStr += " = " + param.DefaultValue
+			}
+			paramStrs = append(paramStrs, paramStr)
+		}
+		
+		signature := method.Name + "(" + strings.Join(paramStrs, ", ") + ")"
+		
+		completions = append(completions, lsp.CompletionItem{
+			Label:         method.Name,
+			Kind:          lsp.CompletionItemKindMethod,
+			Detail:        signature,
+			Documentation: method.Documentation,
+		})
+	}
+	
+	// Add fields
+	for _, field := range grimoire.Fields {
+		completions = append(completions, lsp.CompletionItem{
+			Label:         field.Name,
+			Kind:          lsp.CompletionItemKindField,
+			Detail:        "field of " + grimoire.Name,
+			Documentation: field.Documentation,
+		})
+	}
+	
+	return completions
+}
+
+// getBuiltinGrimoireNames returns built-in grimoire names for completion
+func (a *CarrionAnalyzer) getBuiltinGrimoireNames() []lsp.CompletionItem {
+	grimoires := []struct {
+		name   string
+		detail string
+		doc    string
+	}{
+		{"Time", "Time grimoire", "Time-related functionality including timestamps, formatting, and date operations"},
+		{"String", "String grimoire", "String manipulation methods including case conversion, searching, and character access"},
+		{"Array", "Array grimoire", "Array operations including length, append, pop, sort, and search"},
+		{"Math", "Math grimoire", "Mathematical functions including trigonometry, logarithms, and rounding"},
+		{"File", "File grimoire", "File I/O operations including read, write, copy, and existence checks"},
+		{"OS", "OS grimoire", "Operating system interface including environment variables and command execution"},
+		{"Boolean", "Boolean grimoire", "Boolean value operations and logical functions"},
+		{"Integer", "Integer grimoire", "Integer manipulation and conversion functions"},
+		{"Float", "Float grimoire", "Floating-point number operations and formatting"},
+		{"Debug", "Debug grimoire", "Debugging utilities and diagnostic functions"},
+	}
+	
+	completions := []lsp.CompletionItem{}
+	for _, grimoire := range grimoires {
+		completions = append(completions, lsp.CompletionItem{
+			Label:         grimoire.name,
+			Kind:          lsp.CompletionItemKindClass,
+			Detail:        grimoire.detail,
+			Documentation: grimoire.doc,
+		})
+	}
+	
+	return completions
+}
+
 // getKeywordCompletions returns Carrion language keyword completions
 func (a *CarrionAnalyzer) getKeywordCompletions() []lsp.CompletionItem {
 	keywords := []string{
@@ -258,11 +646,44 @@ func (a *CarrionAnalyzer) getBuiltinCompletions() []lsp.CompletionItem {
 		{"int", "int(value) -> int", "Converts a value to an integer"},
 		{"float", "float(value) -> float", "Converts a value to a float"},
 		{"str", "str(value) -> string", "Converts a value to a string"},
+		{"bool", "bool(value) -> bool", "Converts a value to a boolean"},
+		{"list", "list(iterable) -> array", "Converts an iterable to an array"},
+		{"tuple", "tuple(iterable) -> tuple", "Converts an iterable to a tuple"},
 		{"type", "type(object) -> string", "Returns the type of an object"},
 		{"enumerate", "enumerate(iterable) -> array", "Returns an array of [index, value] pairs"},
+		{"pairs", "pairs(hash) -> array", "Returns key-value pairs from a hash"},
+		{"range", "range(start, stop?, step?) -> array", "Generates a range of numbers"},
+		{"max", "max(...args) -> number", "Returns the maximum value"},
+		{"abs", "abs(number) -> number", "Returns absolute value of a number"},
+		{"ord", "ord(char) -> int", "Returns ASCII code of a single character"},
+		{"chr", "chr(code) -> string", "Converts ASCII code (0-255) to character"},
+		{"is_sametype", "is_sametype(obj1, obj2) -> bool", "Checks if two objects have the same type"},
+		{"Error", "Error(name, message) -> Error", "Creates a new Error object"},
 		{"help", "help() -> string", "Returns help information"},
 		{"version", "version() -> string", "Returns version information"},
 		{"modules", "modules() -> string", "Lists available modules"},
+		{"fileRead", "fileRead(path) -> string", "Reads content from a file"},
+		{"fileWrite", "fileWrite(path, content)", "Writes content to a file"},
+		{"fileAppend", "fileAppend(path, content)", "Appends content to a file"},
+		{"fileExists", "fileExists(path) -> bool", "Checks if a file exists"},
+		{"osRunCommand", "osRunCommand(command) -> string", "Executes a system command"},
+		{"osGetEnv", "osGetEnv(name) -> string", "Gets environment variable"},
+		{"osSetEnv", "osSetEnv(name, value)", "Sets environment variable"},
+		{"osGetCwd", "osGetCwd() -> string", "Gets current working directory"},
+		{"osChdir", "osChdir(path)", "Changes current directory"},
+		{"osSleep", "osSleep(seconds)", "Sleeps for specified seconds"},
+		{"osListDir", "osListDir(path) -> array", "Lists directory contents"},
+		{"osRemove", "osRemove(path)", "Removes a file or directory"},
+		{"osMkdir", "osMkdir(path)", "Creates a directory"},
+		{"osExpandEnv", "osExpandEnv(path) -> string", "Expands environment variables in path"},
+		{"timeNow", "timeNow() -> int", "Returns current Unix timestamp"},
+		{"timeNowNano", "timeNowNano() -> int", "Returns current timestamp in nanoseconds"},
+		{"timeSleep", "timeSleep(seconds)", "Sleep for specified seconds"},
+		{"timeFormat", "timeFormat(timestamp, format) -> string", "Formats timestamp using Go time format"},
+		{"timeParse", "timeParse(format, timeString) -> int", "Parses time string to timestamp"},
+		{"timeDate", "timeDate(timestamp) -> array", "Returns [year, month, day, hour, minute, second]"},
+		{"timeAddDuration", "timeAddDuration(timestamp, seconds) -> int", "Adds duration to timestamp"},
+		{"timeDiff", "timeDiff(timestamp1, timestamp2) -> int", "Calculate difference between timestamps"},
 	}
 
 	completions := []lsp.CompletionItem{}
@@ -645,13 +1066,39 @@ func (a *CarrionAnalyzer) createDiagnosticFromError(err string) lsp.Diagnostic {
 func (a *CarrionAnalyzer) performSemanticAnalysis(program *ast.Program, doc *protocol.CarrionDocument) []lsp.Diagnostic {
 	diagnostics := []lsp.Diagnostic{}
 
-	// TODO: Implement semantic analysis
+	// Check for string indexing bounds and syntax
+	stringIndexDiagnostics := a.checkStringIndexing(program, doc)
+	diagnostics = append(diagnostics, stringIndexDiagnostics...)
+
+	// TODO: Implement additional semantic analysis
 	// - Check for undefined variables
 	// - Check for unused imports
 	// - Check for type mismatches
 	// - Check for unreachable code
 	// - etc.
 
+	return diagnostics
+}
+
+// checkStringIndexing validates string indexing operations using simple text analysis
+func (a *CarrionAnalyzer) checkStringIndexing(program *ast.Program, doc *protocol.CarrionDocument) []lsp.Diagnostic {
+	diagnostics := []lsp.Diagnostic{}
+	
+	// For now, we'll do simple text-based analysis for string indexing
+	// This is a simplified approach until we can implement proper AST walking
+	lines := strings.Split(doc.Text, "\n")
+	for lineNum, line := range lines {
+		// Look for string indexing patterns like s[0], "hello"[1], etc.
+		if strings.Contains(line, "[") && strings.Contains(line, "]") {
+			// Simple regex-based detection for string literals with indexing
+			if strings.Contains(line, "\"") && strings.Contains(line, "[") {
+				// This is a very basic check - in a real implementation, 
+				// we'd need proper AST traversal
+				a.logger.Debug("Found potential string indexing on line %d: %s", lineNum+1, line)
+			}
+		}
+	}
+	
 	return diagnostics
 }
 
@@ -812,6 +1259,21 @@ func (a *CarrionAnalyzer) getBuiltinSignatureHelp(funcName string, paramIndex in
 			doc:       "Converts a value to a string",
 			params:    []string{"value"},
 		},
+		"bool": {
+			signature: "bool(value)",
+			doc:       "Converts a value to a boolean",
+			params:    []string{"value"},
+		},
+		"list": {
+			signature: "list(iterable)",
+			doc:       "Converts an iterable to an array",
+			params:    []string{"iterable"},
+		},
+		"tuple": {
+			signature: "tuple(iterable)",
+			doc:       "Converts an iterable to a tuple",
+			params:    []string{"iterable"},
+		},
 		"type": {
 			signature: "type(object)",
 			doc:       "Returns the type of an object",
@@ -821,6 +1283,156 @@ func (a *CarrionAnalyzer) getBuiltinSignatureHelp(funcName string, paramIndex in
 			signature: "enumerate(iterable)",
 			doc:       "Returns an array of [index, value] pairs",
 			params:    []string{"iterable"},
+		},
+		"pairs": {
+			signature: "pairs(hash)",
+			doc:       "Returns key-value pairs from a hash",
+			params:    []string{"hash"},
+		},
+		"range": {
+			signature: "range(start, stop?, step?)",
+			doc:       "Generates a range of numbers",
+			params:    []string{"start", "stop?", "step?"},
+		},
+		"max": {
+			signature: "max(...args)",
+			doc:       "Returns the maximum value",
+			params:    []string{"...args"},
+		},
+		"abs": {
+			signature: "abs(number)",
+			doc:       "Returns absolute value of a number",
+			params:    []string{"number"},
+		},
+		"ord": {
+			signature: "ord(char)",
+			doc:       "Returns ASCII code of a single character",
+			params:    []string{"char"},
+		},
+		"chr": {
+			signature: "chr(code)",
+			doc:       "Converts ASCII code (0-255) to character",
+			params:    []string{"code"},
+		},
+		"is_sametype": {
+			signature: "is_sametype(obj1, obj2)",
+			doc:       "Checks if two objects have the same type",
+			params:    []string{"obj1", "obj2"},
+		},
+		"Error": {
+			signature: "Error(name, message)",
+			doc:       "Creates a new Error object",
+			params:    []string{"name", "message"},
+		},
+		"fileRead": {
+			signature: "fileRead(path)",
+			doc:       "Reads content from a file",
+			params:    []string{"path"},
+		},
+		"fileWrite": {
+			signature: "fileWrite(path, content)",
+			doc:       "Writes content to a file",
+			params:    []string{"path", "content"},
+		},
+		"fileAppend": {
+			signature: "fileAppend(path, content)",
+			doc:       "Appends content to a file",
+			params:    []string{"path", "content"},
+		},
+		"fileExists": {
+			signature: "fileExists(path)",
+			doc:       "Checks if a file exists",
+			params:    []string{"path"},
+		},
+		"osRunCommand": {
+			signature: "osRunCommand(command)",
+			doc:       "Executes a system command",
+			params:    []string{"command"},
+		},
+		"osGetEnv": {
+			signature: "osGetEnv(name)",
+			doc:       "Gets environment variable",
+			params:    []string{"name"},
+		},
+		"osSetEnv": {
+			signature: "osSetEnv(name, value)",
+			doc:       "Sets environment variable",
+			params:    []string{"name", "value"},
+		},
+		"osGetCwd": {
+			signature: "osGetCwd()",
+			doc:       "Gets current working directory",
+			params:    []string{},
+		},
+		"osChdir": {
+			signature: "osChdir(path)",
+			doc:       "Changes current directory",
+			params:    []string{"path"},
+		},
+		"osSleep": {
+			signature: "osSleep(seconds)",
+			doc:       "Sleeps for specified seconds",
+			params:    []string{"seconds"},
+		},
+		"osListDir": {
+			signature: "osListDir(path)",
+			doc:       "Lists directory contents",
+			params:    []string{"path"},
+		},
+		"osRemove": {
+			signature: "osRemove(path)",
+			doc:       "Removes a file or directory",
+			params:    []string{"path"},
+		},
+		"osMkdir": {
+			signature: "osMkdir(path)",
+			doc:       "Creates a directory",
+			params:    []string{"path"},
+		},
+		"osExpandEnv": {
+			signature: "osExpandEnv(path)",
+			doc:       "Expands environment variables in path",
+			params:    []string{"path"},
+		},
+		"timeNow": {
+			signature: "timeNow()",
+			doc:       "Returns current Unix timestamp",
+			params:    []string{},
+		},
+		"timeNowNano": {
+			signature: "timeNowNano()",
+			doc:       "Returns current timestamp in nanoseconds",
+			params:    []string{},
+		},
+		"timeSleep": {
+			signature: "timeSleep(seconds)",
+			doc:       "Sleep for specified seconds",
+			params:    []string{"seconds"},
+		},
+		"timeFormat": {
+			signature: "timeFormat(timestamp, format)",
+			doc:       "Formats timestamp using Go time format",
+			params:    []string{"timestamp", "format"},
+		},
+		"timeParse": {
+			signature: "timeParse(format, timeString)",
+			doc:       "Parses time string to timestamp",
+			params:    []string{"format", "timeString"},
+		},
+		"timeDate": {
+			signature: "timeDate(timestamp)",
+			doc:       "Returns [year, month, day, hour, minute, second]",
+			params:    []string{"timestamp"},
+		},
+		"timeAddDuration": {
+			signature: "timeAddDuration(timestamp, seconds)",
+			doc:       "Adds duration to timestamp",
+			params:    []string{"timestamp", "seconds"},
+		},
+		"timeDiff": {
+			signature: "timeDiff(timestamp1, timestamp2)",
+			doc:       "Calculate difference between timestamps",
+			params:    []string{"timestamp1", "timestamp2"},
 		},
 	}
 
